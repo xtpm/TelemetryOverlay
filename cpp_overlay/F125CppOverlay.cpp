@@ -464,15 +464,11 @@ void paintTiming(HWND hwnd) {
     HFONT value = makeFont(16, FW_BOLD, L"Bahnschrift SemiCondensed");
     HFONT sectorFont = makeFont(14, FW_BOLD, L"Bahnschrift SemiCondensed");
 
-    uint32_t currentDisplay = s.currentLapMs;
-    if (s.sector >= 3 && s.sector1Ms && s.sector2Ms) currentDisplay = s.sector1Ms + s.sector2Ms;
-    else if (s.sector >= 2 && s.sector1Ms) currentDisplay = s.sector1Ms;
-
     uint32_t best = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
     int delta = referenceDelta(s);
 
     drawText(memDc, L"current:", 16, 15, 80, 16, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, formatLap(currentDisplay), 150, 15, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
+    drawText(memDc, formatLap(s.currentLapMs), 150, 15, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
     drawText(memDc, L"best:", 250, 15, 70, 16, small, rgb(167, 167, 162), DT_LEFT);
     drawText(memDc, formatLap(best), 330, 15, 84, 16, value, rgb(245, 245, 243), DT_RIGHT);
 
