@@ -76,6 +76,8 @@ struct TelemetryState {
     uint32_t liveReferenceLapMs = 0;
     std::vector<std::pair<float, uint32_t>> currentLapTrace;
     std::vector<std::pair<float, uint32_t>> liveReferenceTrace;
+    int stableDeltaMs = DELTA_UNKNOWN;
+    uint64_t stableDeltaTick = 0;
 };
 
 TelemetryState g_state;
@@ -241,17 +243,11 @@ int referenceDelta(const TelemetryState& s) {
             float span = it->first - prev->first;
             float t = span > 0.01f ? (s.lapDistance - prev->first) / span : 0.0f;
             uint32_t refMs = static_cast<uint32_t>(prev->second + (it->second - prev->second) * clampf(t, 0.0f, 1.0f));
-            return static_cast<int>(s.currentLapMs) - static_cast<int>(refMs);
+            int delta = static_cast<int>(s.currentLapMs) - static_cast<int>(refMs);
+            if (std::abs(delta) < 60000) return delta;
         }
     }
 
-    auto ref = s.personalBestLapMs ? s.personalBestSectorsMs : s.sessionBestSectorsMs;
-    uint32_t refLap = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
-    if (s.sector >= 2 && s.sector1Ms && ref[0]) {
-        if (s.sector == 2) return static_cast<int>(s.sector1Ms) - static_cast<int>(ref[0]);
-        if (s.sector >= 3 && s.sector2Ms && ref[1]) return static_cast<int>(s.sector1Ms + s.sector2Ms) - static_cast<int>(ref[0] + ref[1]);
-    }
-    if (s.lastLapMs && refLap) return static_cast<int>(s.lastLapMs) - static_cast<int>(refLap);
     return DELTA_UNKNOWN;
 }
 
@@ -273,10 +269,29 @@ void updateLapTrace(TelemetryState& s) {
 
     if (s.currentLapMs == 0 || s.lapDistance < 0 || s.traceInvalid) return;
 
+    if (!s.currentLapTrace.empty()) {
+        const auto& last = s.currentLapTrace.back();
+        if (s.lapDistance + 20.0f < last.first || s.currentLapMs + 250 < last.second) {
+            s.currentLapTrace.clear();
+            s.traceInvalid = true;
+            return;
+        }
+    }
+
     if (s.currentLapTrace.empty() ||
         s.lapDistance - s.currentLapTrace.back().first >= 2.0f ||
         s.currentLapMs - s.currentLapTrace.back().second >= 100) {
         s.currentLapTrace.push_back({s.lapDistance, s.currentLapMs});
+    }
+
+    int delta = s.stableDeltaMs;
+    uint64_t now = GetTickCount64();
+    if (delta != DELTA_UNKNOWN &&
+        (s.stableDeltaMs == DELTA_UNKNOWN || std::abs(delta - s.stableDeltaMs) < 3000)) {
+        s.stableDeltaMs = delta;
+        s.stableDeltaTick = now;
+    } else if (s.stableDeltaTick && now - s.stableDeltaTick > 1000) {
+        s.stableDeltaMs = DELTA_UNKNOWN;
     }
 }
 
