@@ -284,7 +284,7 @@ void updateLapTrace(TelemetryState& s) {
         s.currentLapTrace.push_back({s.lapDistance, s.currentLapMs});
     }
 
-    int delta = s.stableDeltaMs;
+    int delta = referenceDelta(s);
     uint64_t now = GetTickCount64();
     if (delta != DELTA_UNKNOWN &&
         (s.stableDeltaMs == DELTA_UNKNOWN || std::abs(delta - s.stableDeltaMs) < 3000)) {
@@ -537,7 +537,7 @@ void paintTiming(HWND hwnd) {
     HFONT sectorFont = makeFont(14, FW_BOLD, L"Bahnschrift SemiCondensed");
 
     uint32_t best = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
-    int delta = referenceDelta(s);
+    int delta = s.stableDeltaMs;
 
     drawText(memDc, L"current:", 16, 15, 80, 16, small, rgb(167, 167, 162), DT_LEFT);
     drawText(memDc, formatLap(s.currentLapMs), 150, 15, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
