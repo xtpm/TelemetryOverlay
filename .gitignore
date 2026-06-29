@@ -1,0 +1,21 @@
+# Local build intermediates
+build/
+*.obj
+*.pdb
+*.ilk
+
+# Non-C++ prototype folders
+electron/
+node_modules/
+__pycache__/
+
+# Local preview/prototype artifacts
+electron_overlay_*.png
+
+# Python/Electron prototype launchers and packages
+f1_overlay.py
+run_overlay*.bat
+run_electron_2026.bat
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
