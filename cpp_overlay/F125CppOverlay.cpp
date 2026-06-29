@@ -12,6 +12,8 @@
 #include <thread>
 #include <atomic>
 #include <array>
+#include <vector>
+#include <algorithm>
 #include "resource.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -23,6 +25,7 @@ constexpr int HEADER_SIZE = 29;
 constexpr int ERS_MAX_JOULES = 4000000;
 constexpr int TIMER_ID = 1;
 constexpr int FRAME_MS = 16;
+constexpr int DELTA_UNKNOWN = INT32_MIN;
 
 struct TelemetryState {
     bool connected = false;
@@ -41,6 +44,7 @@ struct TelemetryState {
 
     uint32_t lastLapMs = 0;
     uint32_t currentLapMs = 0;
+    float lapDistance = 0;
     uint32_t sector1Ms = 0;
     uint32_t sector2Ms = 0;
     uint8_t sector = 0;
@@ -66,6 +70,12 @@ struct TelemetryState {
     std::array<uint32_t, 3> personalBestSectorsMs{0, 0, 0};
     uint32_t sessionBestLapMs = 0;
     std::array<uint32_t, 3> sessionBestSectorsMs{0, 0, 0};
+
+    uint8_t traceLap = 0;
+    bool traceInvalid = false;
+    uint32_t liveReferenceLapMs = 0;
+    std::vector<std::pair<float, uint32_t>> currentLapTrace;
+    std::vector<std::pair<float, uint32_t>> liveReferenceTrace;
 };
 
 TelemetryState g_state;
@@ -105,6 +115,7 @@ std::wstring formatShortMs(uint32_t ms) {
 }
 
 std::wstring formatDelta(int deltaMs) {
+    if (deltaMs == DELTA_UNKNOWN) return L"--.---";
     wchar_t buf[32];
     swprintf_s(buf, L"%c%.3f", deltaMs >= 0 ? L'+' : L'-', std::abs(deltaMs) / 1000.0);
     return buf;
@@ -215,6 +226,25 @@ void drawSteer(HDC dc, float steer, int x, int y, int w, HFONT font) {
 }
 
 int referenceDelta(const TelemetryState& s) {
+    if (s.liveReferenceTrace.size() >= 2 && s.currentLapMs > 0 && s.lapDistance >= 0) {
+        const auto& trace = s.liveReferenceTrace;
+        auto it = std::lower_bound(
+            trace.begin(),
+            trace.end(),
+            s.lapDistance,
+            [](const std::pair<float, uint32_t>& sample, float distance) {
+                return sample.first < distance;
+            });
+
+        if (it != trace.begin() && it != trace.end()) {
+            auto prev = it - 1;
+            float span = it->first - prev->first;
+            float t = span > 0.01f ? (s.lapDistance - prev->first) / span : 0.0f;
+            uint32_t refMs = static_cast<uint32_t>(prev->second + (it->second - prev->second) * clampf(t, 0.0f, 1.0f));
+            return static_cast<int>(s.currentLapMs) - static_cast<int>(refMs);
+        }
+    }
+
     auto ref = s.personalBestLapMs ? s.personalBestSectorsMs : s.sessionBestSectorsMs;
     uint32_t refLap = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
     if (s.sector >= 2 && s.sector1Ms && ref[0]) {
@@ -222,7 +252,32 @@ int referenceDelta(const TelemetryState& s) {
         if (s.sector >= 3 && s.sector2Ms && ref[1]) return static_cast<int>(s.sector1Ms + s.sector2Ms) - static_cast<int>(ref[0] + ref[1]);
     }
     if (s.lastLapMs && refLap) return static_cast<int>(s.lastLapMs) - static_cast<int>(refLap);
-    return 0;
+    return DELTA_UNKNOWN;
+}
+
+void updateLapTrace(TelemetryState& s) {
+    if (s.traceLap != 0 && s.lap != s.traceLap) {
+        if (!s.traceInvalid && s.lastLapMs > 0 && s.currentLapTrace.size() > 20 &&
+            (s.liveReferenceLapMs == 0 || s.lastLapMs <= s.liveReferenceLapMs)) {
+            s.liveReferenceLapMs = s.lastLapMs;
+            s.liveReferenceTrace = s.currentLapTrace;
+        }
+
+        s.currentLapTrace.clear();
+        s.traceInvalid = false;
+        s.traceLap = s.lap;
+    }
+
+    if (s.traceLap == 0) s.traceLap = s.lap;
+    if (s.invalidLap) s.traceInvalid = true;
+
+    if (s.currentLapMs == 0 || s.lapDistance < 0 || s.traceInvalid) return;
+
+    if (s.currentLapTrace.empty() ||
+        s.lapDistance - s.currentLapTrace.back().first >= 2.0f ||
+        s.currentLapMs - s.currentLapTrace.back().second >= 100) {
+        s.currentLapTrace.push_back({s.lapDistance, s.currentLapMs});
+    }
 }
 
 void parseLapData(const uint8_t* data, size_t size, uint8_t playerIndex, TelemetryState& s) {
@@ -232,12 +287,14 @@ void parseLapData(const uint8_t* data, size_t size, uint8_t playerIndex, Telemet
     s.currentLapMs = readAt<uint32_t>(data, size, base + 4);
     s.sector1Ms = readAt<uint16_t>(data, size, base + 8) + readAt<uint8_t>(data, size, base + 10) * 60000u;
     s.sector2Ms = readAt<uint16_t>(data, size, base + 11) + readAt<uint8_t>(data, size, base + 13) * 60000u;
+    s.lapDistance = readAt<float>(data, size, base + 18);
     s.position = readAt<uint8_t>(data, size, base + 32);
     s.lap = readAt<uint8_t>(data, size, base + 33);
     s.sector = readAt<uint8_t>(data, size, base + 36) + 1;
     s.invalidLap = readAt<uint8_t>(data, size, base + 37);
     s.penalties = readAt<uint8_t>(data, size, base + 38);
     s.warnings = readAt<uint8_t>(data, size, base + 39);
+    updateLapTrace(s);
 }
 
 void parseTelemetry(const uint8_t* data, size_t size, uint16_t format, uint8_t playerIndex, TelemetryState& s) {
@@ -475,7 +532,8 @@ void paintTiming(HWND hwnd) {
     drawText(memDc, L"last:", 16, 40, 80, 16, small, rgb(167, 167, 162), DT_LEFT);
     drawText(memDc, formatLap(s.lastLapMs), 150, 40, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
     drawText(memDc, L"delta:", 250, 40, 70, 16, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, formatDelta(delta), 330, 40, 84, 16, value, delta <= 0 ? rgb(35, 243, 106) : rgb(255, 74, 74), DT_RIGHT);
+    COLORREF deltaColor = delta == DELTA_UNKNOWN ? rgb(245, 245, 243) : (delta <= 0 ? rgb(35, 243, 106) : rgb(255, 74, 74));
+    drawText(memDc, formatDelta(delta), 330, 40, 84, 16, value, deltaColor, DT_RIGHT);
 
     strokeRect(memDc, 16, 72, rc.right - 32, 36, rgb(64, 64, 64));
     int col = (rc.right - 32) / 3;
