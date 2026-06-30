@@ -251,6 +251,43 @@ int referenceDelta(const TelemetryState& s) {
     return DELTA_UNKNOWN;
 }
 
+int fallbackDelta(const TelemetryState& s) {
+    auto ref = s.personalBestLapMs ? s.personalBestSectorsMs : s.sessionBestSectorsMs;
+    uint32_t refLap = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
+    if (!refLap) return DELTA_UNKNOWN;
+
+    if (!ref[0] && !ref[1] && !ref[2]) {
+        return s.currentLapMs ? static_cast<int>(s.currentLapMs) - static_cast<int>(refLap) : DELTA_UNKNOWN;
+    }
+
+    if (!ref[2] && ref[0] && ref[1] && refLap > ref[0] + ref[1]) {
+        ref[2] = refLap - ref[0] - ref[1];
+    }
+
+    if (s.sector <= 1 && ref[0] && s.currentLapMs) {
+        return static_cast<int>(s.currentLapMs) - static_cast<int>(ref[0]);
+    }
+
+    if (s.sector == 2 && ref[0] && ref[1] && s.sector1Ms && s.currentLapMs >= s.sector1Ms) {
+        uint32_t currentIntoSector = s.currentLapMs - s.sector1Ms;
+        uint32_t refSectorProgress = currentIntoSector < ref[1] ? currentIntoSector : ref[1];
+        uint32_t refAtPoint = ref[0] + refSectorProgress;
+        return static_cast<int>(s.currentLapMs) - static_cast<int>(refAtPoint);
+    }
+
+    if (s.sector >= 3 && ref[0] && ref[1] && ref[2] && s.sector1Ms && s.sector2Ms) {
+        uint32_t currentS3Start = s.sector1Ms + s.sector2Ms;
+        if (s.currentLapMs >= currentS3Start) {
+            uint32_t currentIntoSector = s.currentLapMs - currentS3Start;
+            uint32_t refSectorProgress = currentIntoSector < ref[2] ? currentIntoSector : ref[2];
+            uint32_t refAtPoint = ref[0] + ref[1] + refSectorProgress;
+            return static_cast<int>(s.currentLapMs) - static_cast<int>(refAtPoint);
+        }
+    }
+
+    return DELTA_UNKNOWN;
+}
+
 void updateLapTrace(TelemetryState& s) {
     if (s.traceLap != 0 && s.lap != s.traceLap) {
         if (!s.traceInvalid && s.lastLapMs > 0 && s.currentLapTrace.size() > 20 &&
@@ -285,6 +322,7 @@ void updateLapTrace(TelemetryState& s) {
     }
 
     int delta = referenceDelta(s);
+    if (delta == DELTA_UNKNOWN) delta = fallbackDelta(s);
     uint64_t now = GetTickCount64();
     if (delta != DELTA_UNKNOWN &&
         (s.stableDeltaMs == DELTA_UNKNOWN || std::abs(delta - s.stableDeltaMs) < 3000)) {
