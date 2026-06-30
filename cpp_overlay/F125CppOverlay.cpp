@@ -302,7 +302,7 @@ void parseLapData(const uint8_t* data, size_t size, uint8_t playerIndex, Telemet
     s.currentLapMs = readAt<uint32_t>(data, size, base + 4);
     s.sector1Ms = readAt<uint16_t>(data, size, base + 8) + readAt<uint8_t>(data, size, base + 10) * 60000u;
     s.sector2Ms = readAt<uint16_t>(data, size, base + 11) + readAt<uint8_t>(data, size, base + 13) * 60000u;
-    s.lapDistance = readAt<float>(data, size, base + 18);
+    s.lapDistance = readAt<float>(data, size, base + 20);
     s.position = readAt<uint8_t>(data, size, base + 32);
     s.lap = readAt<uint8_t>(data, size, base + 33);
     s.sector = readAt<uint8_t>(data, size, base + 36) + 1;
