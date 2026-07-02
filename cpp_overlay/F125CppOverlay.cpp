@@ -65,6 +65,8 @@ struct TelemetryState {
     uint8_t activeAeroMode = 0;
     uint8_t activeAeroAvailable = 0;
     uint8_t overtakeActive = 0;
+    uint8_t drsAllowed = 0;
+    uint16_t drsActivationDistance = 0;
 
     uint32_t personalBestLapMs = 0;
     std::array<uint32_t, 3> personalBestSectorsMs{0, 0, 0};
@@ -86,6 +88,13 @@ std::atomic<bool> g_running{true};
 HWND g_hud = nullptr;
 HWND g_timing = nullptr;
 HINSTANCE g_instance = nullptr;
+
+enum class RegulationMode {
+    Reg2025,
+    Reg2026
+};
+
+RegulationMode g_regulationMode = RegulationMode::Reg2026;
 
 template <typename T>
 T readAt(const uint8_t* data, size_t size, size_t offset) {
@@ -155,10 +164,19 @@ std::wstring ersModeText(uint8_t mode) {
 }
 
 std::wstring wingText(const TelemetryState& s) {
+    if (g_regulationMode == RegulationMode::Reg2025) {
+        if (s.drsAllowed) return L"ready";
+        if (s.drsActivationDistance) return std::to_wstring(s.drsActivationDistance) + L"m";
+        return L"--";
+    }
     if (s.activeAeroMode) return L"straight";
     if (s.activeAeroAvailable) return L"ready";
     if (s.packetFormat == 2026) return L"std";
     return L"--";
+}
+
+const wchar_t* regulationTitle() {
+    return g_regulationMode == RegulationMode::Reg2025 ? L"2025 regs" : L"2026 regs";
 }
 
 COLORREF rgb(int r, int g, int b) {
@@ -372,6 +390,8 @@ void parseStatus(const uint8_t* data, size_t size, uint16_t format, uint8_t play
     s.fuelLaps = readAt<float>(data, size, base + 13);
     s.maxRpm = readAt<uint16_t>(data, size, base + 17);
     if (!s.maxRpm) s.maxRpm = 12000;
+    s.drsAllowed = readAt<uint8_t>(data, size, base + 22);
+    s.drsActivationDistance = readAt<uint16_t>(data, size, base + 23);
     s.tyreCompound = readAt<uint8_t>(data, size, base + 25);
     s.tyreAge = readAt<uint8_t>(data, size, base + 27);
     s.ersEnergy = readAt<float>(data, size, base + 37);
@@ -501,6 +521,7 @@ void paintHud(HWND hwnd) {
 
     drawText(memDc, L"r_", 92, 10, 22, 16, small, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 120, 11, 112, 14, tiny, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, regulationTitle(), 432, 10, 96, 14, tiny, rgb(245, 213, 71), DT_RIGHT);
 
     int revX = 92;
     int lit = static_cast<int>(std::round(clampf(s.revLights / 100.0f, 0, 1) * 18));
@@ -525,7 +546,7 @@ void paintHud(HWND hwnd) {
     wchar_t pen[16];
     swprintf_s(pen, L"%us / %uw", s.penalties, s.warnings);
     drawChip(memDc, L"pen", pen, 128, y, 70, small, value);
-    drawChip(memDc, L"wing", wingText(s), 204, y, 64, small, value);
+    drawChip(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"drs" : L"wing", wingText(s), 204, y, 64, small, value);
     wchar_t fuel[16];
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
     drawChip(memDc, L"fuel", fuel, 274, y, 58, small, value);
@@ -645,9 +666,8 @@ HWND createOverlayWindow(const wchar_t* cls, const wchar_t* title, int x, int y,
 }
 
 enum MenuCommand {
-    ID_HUD = 1001,
-    ID_TIMING = 1002,
-    ID_BOTH = 1003,
+    ID_REG_2025 = 1001,
+    ID_REG_2026 = 1002,
     ID_EXIT = 1004
 };
 
@@ -661,17 +681,17 @@ struct LauncherAction {
 int g_hoverAction = 0;
 
 LauncherAction g_actions[] = {
-    {ID_BOTH, {24, 112, 456, 162}, L"launch everything", L"opens retrial HUD and timing strip"},
-    {ID_HUD, {24, 174, 456, 224}, L"retrial HUD only", L"speed, gear, inputs, systems"},
-    {ID_TIMING, {24, 236, 456, 286}, L"timing strip only", L"current, best, delta, sectors"},
+    {ID_REG_2025, {24, 126, 456, 188}, L"2025 Regulations", L"DRS era overlay for 2025 cars"},
+    {ID_REG_2026, {24, 204, 456, 266}, L"2026 Regulations", L"active aero overlay for 2026 cars"},
     {ID_EXIT, {336, 316, 456, 352}, L"exit", L"close launcher"}
 };
 
-void launchAction(int id) {
-    if ((id == ID_HUD || id == ID_BOTH) && !g_hud) {
-            g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 545, 168, hudProc);
+void launchRegulation(RegulationMode mode) {
+    g_regulationMode = mode;
+    if (!g_hud) {
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 545, 168, hudProc);
     }
-    if ((id == ID_TIMING || id == ID_BOTH) && !g_timing) {
+    if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
     }
 }
@@ -687,7 +707,7 @@ void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT ti
     drawText(dc, action.title, action.rect.left + 16, action.rect.top + 9, 260, 16, titleFont, rgb(245, 245, 243), DT_LEFT);
     drawText(dc, action.subtitle, action.rect.left + 16, action.rect.top + 29, 290, 14, bodyFont, rgb(167, 167, 162), DT_LEFT);
     if (action.id != ID_EXIT) {
-        drawText(dc, L"open", action.rect.right - 66, action.rect.top + 16, 44, 16, bodyFont, hover ? rgb(35, 243, 106) : rgb(167, 167, 162), DT_RIGHT);
+        drawText(dc, L"select", action.rect.right - 76, action.rect.top + 22, 54, 16, bodyFont, hover ? rgb(35, 243, 106) : rgb(167, 167, 162), DT_RIGHT);
     }
 }
 
@@ -713,7 +733,7 @@ void paintLauncher(HWND hwnd) {
 
     drawText(memDc, L"r_", 40, 24, 34, 20, logo, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, L"f1 telemetry", 40, 48, 220, 34, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"native c++ overlay launcher", 40, 82, 260, 16, label, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"choose regulation format", 40, 82, 260, 16, label, rgb(167, 167, 162), DT_LEFT);
 
     TelemetryState s;
     {
@@ -727,7 +747,7 @@ void paintLauncher(HWND hwnd) {
         drawLauncherCard(memDc, action, g_hoverAction == action.id, label, body);
     }
 
-    drawText(memDc, L"tip: drag overlay windows to place them. esc closes each overlay.", 24, 326, 310, 16, body, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, L"tip: set the same UDP format in F1 25 telemetry settings.", 24, 326, 310, 16, body, rgb(110, 110, 104), DT_LEFT);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -785,8 +805,10 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (PtInRect(&action.rect, pt)) {
                 if (action.id == ID_EXIT) {
                     DestroyWindow(hwnd);
+                } else if (action.id == ID_REG_2025) {
+                    launchRegulation(RegulationMode::Reg2025);
                 } else {
-                    launchAction(action.id);
+                    launchRegulation(RegulationMode::Reg2026);
                 }
                 return 0;
             }
