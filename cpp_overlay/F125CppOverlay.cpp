@@ -65,6 +65,7 @@ struct TelemetryState {
     uint8_t activeAeroMode = 0;
     uint8_t activeAeroAvailable = 0;
     uint8_t overtakeActive = 0;
+    uint8_t drsActive = 0;
     uint8_t drsAllowed = 0;
     uint16_t drsActivationDistance = 0;
 
@@ -165,6 +166,7 @@ std::wstring ersModeText(uint8_t mode) {
 
 std::wstring wingText(const TelemetryState& s) {
     if (g_regulationMode == RegulationMode::Reg2025) {
+        if (s.drsActive) return L"open";
         if (s.drsAllowed) return L"ready";
         if (s.drsActivationDistance) return std::to_wstring(s.drsActivationDistance) + L"m";
         return L"--";
@@ -177,6 +179,17 @@ std::wstring wingText(const TelemetryState& s) {
 
 const wchar_t* regulationTitle() {
     return g_regulationMode == RegulationMode::Reg2025 ? L"2025 regs" : L"2026 regs";
+}
+
+bool supportedPacketFormat(uint16_t format) {
+    return format == 2026 || format == 2025 || format == 2024 || format == 2023;
+}
+
+bool looksLike2026Layout(uint8_t packetId, size_t size, uint16_t format) {
+    if (format == 2026) return true;
+    if (packetId == 6) return size > 1400;
+    if (packetId == 7) return size > 1300;
+    return false;
 }
 
 COLORREF rgb(int r, int g, int b) {
@@ -369,7 +382,8 @@ void parseLapData(const uint8_t* data, size_t size, uint8_t playerIndex, Telemet
 }
 
 void parseTelemetry(const uint8_t* data, size_t size, uint16_t format, uint8_t playerIndex, TelemetryState& s) {
-    size_t stride = format == 2026 ? 59 : 60;
+    bool layout2026 = looksLike2026Layout(6, size, format);
+    size_t stride = layout2026 ? 59 : 60;
     size_t base = HEADER_SIZE + static_cast<size_t>(playerIndex) * stride;
     if (base + stride > size) return;
     s.speed = readAt<uint16_t>(data, size, base + 0);
@@ -378,11 +392,13 @@ void parseTelemetry(const uint8_t* data, size_t size, uint16_t format, uint8_t p
     s.brake = readAt<float>(data, size, base + 10);
     s.gear = readAt<int8_t>(data, size, base + 15);
     s.rpm = readAt<uint16_t>(data, size, base + 16);
+    s.drsActive = layout2026 ? 0 : readAt<uint8_t>(data, size, base + 18);
     s.revLights = readAt<uint8_t>(data, size, base + 19);
 }
 
 void parseStatus(const uint8_t* data, size_t size, uint16_t format, uint8_t playerIndex, TelemetryState& s) {
-    size_t stride = format == 2026 ? 59 : 55;
+    bool layout2026 = looksLike2026Layout(7, size, format);
+    size_t stride = layout2026 ? 59 : 55;
     size_t base = HEADER_SIZE + static_cast<size_t>(playerIndex) * stride;
     if (base + stride > size) return;
     s.fuelInTank = readAt<float>(data, size, base + 5);
@@ -424,7 +440,7 @@ void parsePacket(const uint8_t* data, size_t size) {
     uint16_t format = readAt<uint16_t>(data, size, 0);
     uint8_t packetId = readAt<uint8_t>(data, size, 6);
     uint8_t playerIndex = readAt<uint8_t>(data, size, 27);
-    if ((format != 2025 && format != 2026) || playerIndex >= 24) return;
+    if (!supportedPacketFormat(format) || playerIndex >= 24) return;
 
     std::lock_guard<std::mutex> lock(g_stateMutex);
     g_state.packetFormat = format;
@@ -435,7 +451,7 @@ void parsePacket(const uint8_t* data, size_t size) {
     if (packetId == 6) parseTelemetry(data, size, format, playerIndex, g_state);
     if (packetId == 7) parseStatus(data, size, format, playerIndex, g_state);
     if (packetId == 14) parseTimeTrial(data, size, g_state);
-    if (packetId == 16 && format == 2026) parseTelemetry2(data, size, playerIndex, g_state);
+    if (packetId == 16 && looksLike2026Layout(packetId, size, format)) parseTelemetry2(data, size, playerIndex, g_state);
 }
 
 void udpThread() {
@@ -522,6 +538,10 @@ void paintHud(HWND hwnd) {
     drawText(memDc, L"r_", 92, 10, 22, 16, small, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 120, 11, 112, 14, tiny, rgb(110, 110, 104), DT_LEFT);
     drawText(memDc, regulationTitle(), 432, 10, 96, 14, tiny, rgb(245, 213, 71), DT_RIGHT);
+    if (s.packetFormat) {
+        std::wstring udpFormat = L"udp " + std::to_wstring(s.packetFormat);
+        drawText(memDc, udpFormat, 338, 10, 76, 14, tiny, rgb(167, 167, 162), DT_RIGHT);
+    }
 
     int revX = 92;
     int lit = static_cast<int>(std::round(clampf(s.revLights / 100.0f, 0, 1) * 18));
