@@ -227,9 +227,9 @@ void drawText(HDC dc, const std::wstring& text, int x, int y, int w, int h, HFON
 }
 
 void drawChip(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont) {
-    strokeRect(dc, x, y, w, 28, rgb(64, 64, 64));
-    drawText(dc, label, x + 2, y + 3, w - 4, 9, small, rgb(160, 160, 154), DT_CENTER);
-    drawText(dc, value, x + 2, y + 15, w - 4, 12, valueFont, rgb(245, 245, 243), DT_CENTER);
+    strokeRect(dc, x, y, w, 34, rgb(64, 64, 64));
+    drawText(dc, label, x + 3, y + 4, w - 6, 10, small, rgb(160, 160, 154), DT_CENTER);
+    drawText(dc, value, x + 3, y + 17, w - 6, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
 void drawBar(HDC dc, const wchar_t* label, float value, int x, int y, int w, COLORREF color, HFONT font) {
@@ -525,7 +525,7 @@ void paintHud(HWND hwnd) {
 
     HFONT tiny = makeFont(8, FW_BOLD);
     HFONT small = makeFont(9, FW_BOLD);
-    HFONT value = makeFont(13, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT value = makeFont(11, FW_BOLD, L"Bahnschrift SemiCondensed");
     HFONT big = makeFont(38, FW_BOLD, L"Bahnschrift SemiCondensed");
     HFONT med = makeFont(27, FW_BOLD, L"Bahnschrift SemiCondensed");
 
@@ -560,25 +560,25 @@ void paintHud(HWND hwnd) {
 
     fillRect(memDc, 0, 86, rc.right, 1, rgb(28, 28, 28));
     int y = 94;
-    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 12, y, 34, small, value);
-    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 50, y, 34, small, value);
-    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 88, y, 34, small, value);
+    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 12, y, 36, small, value);
+    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 54, y, 36, small, value);
+    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 96, y, 36, small, value);
     wchar_t pen[16];
     swprintf_s(pen, L"%us / %uw", s.penalties, s.warnings);
-    drawChip(memDc, L"pen", pen, 128, y, 70, small, value);
-    drawChip(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"drs" : L"wing", wingText(s), 204, y, 64, small, value);
+    drawChip(memDc, L"pen", pen, 138, y, 76, small, value);
+    drawChip(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"drs" : L"wing", wingText(s), 220, y, 68, small, value);
     wchar_t fuel[16];
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
-    drawChip(memDc, L"fuel", fuel, 274, y, 58, small, value);
+    drawChip(memDc, L"fuel", fuel, 294, y, 58, small, value);
     wchar_t est[16];
     swprintf_s(est, L"%.1f", s.fuelLaps);
-    drawChip(memDc, L"est", est, 338, y, 50, small, value);
-    drawChip(memDc, L"ers", ersModeText(s.ersMode), 394, y, 72, small, value);
-    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 472, y, 60, small, value);
+    drawChip(memDc, L"est", est, 358, y, 50, small, value);
+    drawChip(memDc, L"ers", ersModeText(s.ersMode), 414, y, 74, small, value);
+    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 494, y, 58, small, value);
 
-    drawBar(memDc, L"thr", s.throttle, 12, 150, 160, rgb(35, 243, 106), tiny);
-    drawBar(memDc, L"brk", s.brake, 190, 150, 160, rgb(255, 74, 74), tiny);
-    drawSteer(memDc, s.steer, 368, 150, 160, tiny);
+    drawBar(memDc, L"thr", s.throttle, 12, 156, 164, rgb(35, 243, 106), tiny);
+    drawBar(memDc, L"brk", s.brake, 194, 156, 164, rgb(255, 74, 74), tiny);
+    drawSteer(memDc, s.steer, 376, 156, 164, tiny);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -709,7 +709,7 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 545, 168, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 565, 180, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
