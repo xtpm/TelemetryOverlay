@@ -53,6 +53,15 @@ struct TelemetryState {
     uint8_t invalidLap = 0;
     uint8_t penalties = 0;
     uint8_t warnings = 0;
+    uint8_t totalLaps = 0;
+    uint8_t sessionType = 0;
+    uint16_t sessionTimeLeft = 0;
+    uint8_t pitSpeedLimit = 0;
+    uint8_t safetyCarStatus = 0;
+    uint8_t pitStopWindowIdealLap = 0;
+    uint8_t pitStopWindowLatestLap = 0;
+    uint8_t pitStopRejoinPosition = 0;
+    int8_t vehicleFiaFlags = -1;
 
     float fuelLaps = 0;
     float fuelInTank = 0;
@@ -68,6 +77,14 @@ struct TelemetryState {
     uint8_t drsActive = 0;
     uint8_t drsAllowed = 0;
     uint16_t drsActivationDistance = 0;
+    uint8_t drsFault = 0;
+    uint8_t ersFault = 0;
+
+    std::array<uint16_t, 4> brakeTemps{0, 0, 0, 0};
+    std::array<uint8_t, 4> tyreSurfaceTemps{0, 0, 0, 0};
+    std::array<uint8_t, 4> tyreInnerTemps{0, 0, 0, 0};
+    std::array<float, 4> tyreWear{0, 0, 0, 0};
+    std::array<uint8_t, 4> tyreBlisters{0, 0, 0, 0};
 
     uint32_t personalBestLapMs = 0;
     std::array<uint32_t, 3> personalBestSectorsMs{0, 0, 0};
@@ -133,6 +150,13 @@ std::wstring formatDelta(int deltaMs) {
     return buf;
 }
 
+std::wstring formatClock(uint16_t secondsLeft) {
+    if (!secondsLeft) return L"--:--";
+    wchar_t buf[16];
+    swprintf_s(buf, L"%u:%02u", secondsLeft / 60, secondsLeft % 60);
+    return buf;
+}
+
 std::wstring gearText(int gear) {
     if (gear == -1) return L"R";
     if (gear == 0) return L"N";
@@ -164,6 +188,55 @@ std::wstring ersModeText(uint8_t mode) {
     }
 }
 
+std::wstring sessionTypeText(uint8_t type) {
+    switch (type) {
+        case 1: return L"P1";
+        case 2: return L"P2";
+        case 3: return L"P3";
+        case 4: return L"SHORT P";
+        case 5: return L"Q1";
+        case 6: return L"Q2";
+        case 7: return L"Q3";
+        case 8: return L"SHORT Q";
+        case 10: return L"RACE";
+        case 11: return L"RACE 2";
+        case 12: return L"RACE 3";
+        case 13: return L"TT";
+        default: return L"--";
+    }
+}
+
+std::wstring safetyCarText(uint8_t status) {
+    switch (status) {
+        case 1: return L"SC";
+        case 2: return L"VSC";
+        case 3: return L"FORM";
+        default: return L"CLEAR";
+    }
+}
+
+std::wstring flagsText(int8_t flags) {
+    switch (flags) {
+        case -1: return L"INV";
+        case 1: return L"GREEN";
+        case 2: return L"BLUE";
+        case 3: return L"YELLOW";
+        case 4: return L"RED";
+        default: return L"--";
+    }
+}
+
+std::wstring warningText(const TelemetryState& s, float ersPct) {
+    if (s.drsFault) return L"DRS FAULT";
+    if (s.ersFault) return L"ERS FAULT";
+    if (ersPct <= 10.0f) return L"ERS LOW";
+    if (g_regulationMode == RegulationMode::Reg2025 && s.drsAllowed) return L"DRS READY";
+    if (g_regulationMode == RegulationMode::Reg2026 && s.activeAeroAvailable) return L"AERO READY";
+    if (s.safetyCarStatus) return safetyCarText(s.safetyCarStatus);
+    if (s.vehicleFiaFlags == 3 || s.vehicleFiaFlags == 4) return flagsText(s.vehicleFiaFlags);
+    return L"NOMINAL";
+}
+
 std::wstring wingText(const TelemetryState& s) {
     if (g_regulationMode == RegulationMode::Reg2025) {
         if (s.drsActive) return L"open";
@@ -179,6 +252,24 @@ std::wstring wingText(const TelemetryState& s) {
 
 bool regulationSystemActive(const TelemetryState& s) {
     return g_regulationMode == RegulationMode::Reg2025 ? s.drsActive != 0 : s.activeAeroMode != 0;
+}
+
+COLORREF tempColor(uint16_t temp) {
+    if (temp >= 115) return RGB(255, 74, 74);
+    if (temp >= 105) return RGB(245, 213, 71);
+    return RGB(35, 243, 106);
+}
+
+COLORREF brakeColor(uint16_t temp) {
+    if (temp >= 950) return RGB(255, 74, 74);
+    if (temp >= 800) return RGB(245, 213, 71);
+    return RGB(35, 243, 106);
+}
+
+COLORREF wearColor(float wear) {
+    if (wear >= 65.0f) return RGB(255, 74, 74);
+    if (wear >= 40.0f) return RGB(245, 213, 71);
+    return RGB(35, 243, 106);
 }
 
 const wchar_t* regulationTitle() {
@@ -240,6 +331,20 @@ void drawStatCell(HDC dc, const wchar_t* label, const std::wstring& value, int x
     if (divider) fillRect(dc, x, y + 7, 1, 26, rgb(58, 58, 56));
     drawText(dc, label, x + 8, y + 5, w - 16, 10, small, rgb(160, 160, 154), DT_CENTER);
     drawText(dc, value, x + 8, y + 18, w - 16, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+}
+
+void drawInfoCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont, COLORREF color = RGB(245, 245, 243)) {
+    drawText(dc, label, x, y, w, 10, small, rgb(160, 160, 154), DT_LEFT);
+    drawText(dc, value, x, y + 12, w, 16, valueFont, color, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+}
+
+void drawTyreCorner(HDC dc, const wchar_t* label, uint8_t temp, float wear, uint8_t blister, int x, int y, int w, HFONT tiny, HFONT valueFont) {
+    drawText(dc, label, x, y, 22, 11, tiny, rgb(160, 160, 154), DT_LEFT);
+    drawText(dc, std::to_wstring(temp) + L"C", x + 24, y, 42, 12, valueFont, tempColor(temp), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(dc, std::to_wstring(static_cast<int>(std::round(wear))) + L"%", x + 70, y, 34, 12, valueFont, wearColor(wear), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    if (blister) {
+        drawText(dc, L"B" + std::to_wstring(blister), x + w - 26, y, 26, 12, tiny, rgb(255, 74, 74), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    }
 }
 
 void drawBar(HDC dc, const wchar_t* label, float value, int x, int y, int w, COLORREF color, HFONT font) {
@@ -388,7 +493,21 @@ void parseLapData(const uint8_t* data, size_t size, uint8_t playerIndex, Telemet
     s.invalidLap = readAt<uint8_t>(data, size, base + 37);
     s.penalties = readAt<uint8_t>(data, size, base + 38);
     s.warnings = readAt<uint8_t>(data, size, base + 39);
+    s.vehicleFiaFlags = readAt<int8_t>(data, size, base + 54);
     updateLapTrace(s);
+}
+
+void parseSession(const uint8_t* data, size_t size, TelemetryState& s) {
+    if (HEADER_SIZE + 656 > size) return;
+    size_t base = HEADER_SIZE;
+    s.totalLaps = readAt<uint8_t>(data, size, base + 3);
+    s.sessionType = readAt<uint8_t>(data, size, base + 6);
+    s.sessionTimeLeft = readAt<uint16_t>(data, size, base + 9);
+    s.pitSpeedLimit = readAt<uint8_t>(data, size, base + 13);
+    s.safetyCarStatus = readAt<uint8_t>(data, size, base + 124);
+    s.pitStopWindowIdealLap = readAt<uint8_t>(data, size, base + 653);
+    s.pitStopWindowLatestLap = readAt<uint8_t>(data, size, base + 654);
+    s.pitStopRejoinPosition = readAt<uint8_t>(data, size, base + 655);
 }
 
 void parseTelemetry(const uint8_t* data, size_t size, uint16_t format, uint8_t playerIndex, TelemetryState& s) {
@@ -404,6 +523,14 @@ void parseTelemetry(const uint8_t* data, size_t size, uint16_t format, uint8_t p
     s.rpm = readAt<uint16_t>(data, size, base + 16);
     s.drsActive = layout2026 ? 0 : readAt<uint8_t>(data, size, base + 18);
     s.revLights = readAt<uint8_t>(data, size, base + 19);
+    size_t brakeBase = base + (layout2026 ? 21 : 22);
+    size_t surfaceBase = base + (layout2026 ? 29 : 30);
+    size_t innerBase = base + (layout2026 ? 33 : 34);
+    for (int i = 0; i < 4; ++i) {
+        s.brakeTemps[i] = readAt<uint16_t>(data, size, brakeBase + i * 2);
+        s.tyreSurfaceTemps[i] = readAt<uint8_t>(data, size, surfaceBase + i);
+        s.tyreInnerTemps[i] = readAt<uint8_t>(data, size, innerBase + i);
+    }
 }
 
 void parseStatus(const uint8_t* data, size_t size, uint16_t format, uint8_t playerIndex, TelemetryState& s) {
@@ -432,6 +559,18 @@ void parseTelemetry2(const uint8_t* data, size_t size, uint8_t playerIndex, Tele
     s.overtakeActive = readAt<uint8_t>(data, size, base + 5);
 }
 
+void parseDamage(const uint8_t* data, size_t size, uint8_t playerIndex, TelemetryState& s) {
+    constexpr size_t stride = 46;
+    size_t base = HEADER_SIZE + static_cast<size_t>(playerIndex) * stride;
+    if (base + stride > size) return;
+    for (int i = 0; i < 4; ++i) {
+        s.tyreWear[i] = readAt<float>(data, size, base + i * 4);
+        s.tyreBlisters[i] = readAt<uint8_t>(data, size, base + 24 + i);
+    }
+    s.drsFault = readAt<uint8_t>(data, size, base + 34);
+    s.ersFault = readAt<uint8_t>(data, size, base + 35);
+}
+
 void parseTimeTrial(const uint8_t* data, size_t size, TelemetryState& s) {
     if (HEADER_SIZE + 75 > size) return;
     auto readSet = [&](size_t base, uint32_t& lap, std::array<uint32_t, 3>& sectors) {
@@ -457,9 +596,11 @@ void parsePacket(const uint8_t* data, size_t size) {
     g_state.connected = true;
     g_state.lastSeenTick = GetTickCount64();
     g_state.packetCount++;
+    if (packetId == 1) parseSession(data, size, g_state);
     if (packetId == 2) parseLapData(data, size, playerIndex, g_state);
     if (packetId == 6) parseTelemetry(data, size, format, playerIndex, g_state);
     if (packetId == 7) parseStatus(data, size, format, playerIndex, g_state);
+    if (packetId == 10) parseDamage(data, size, playerIndex, g_state);
     if (packetId == 14) parseTimeTrial(data, size, g_state);
     if (packetId == 16 && looksLike2026Layout(packetId, size, format)) parseTelemetry2(data, size, playerIndex, g_state);
 }
@@ -545,6 +686,7 @@ void paintHud(HWND hwnd) {
     COLORREF line = rgb(58, 58, 56);
     COLORREF muted = rgb(150, 150, 144);
     COLORREF systemColor = regulationSystemActive(s) ? rgb(35, 243, 106) : rgb(255, 74, 74);
+    float ersPct = ers * 100.0f;
 
     fillRect(memDc, 12, 12, 94, 92, panel);
     strokeRect(memDc, 12, 12, 94, 92, line);
@@ -610,6 +752,44 @@ void paintHud(HWND hwnd) {
     drawBar(memDc, L"thr", s.throttle, 24, 188, 172, rgb(35, 243, 106), tiny);
     drawBar(memDc, L"brk", s.brake, 224, 188, 172, rgb(255, 74, 74), tiny);
     drawSteer(memDc, s.steer, 424, 188, 172, tiny);
+
+    fillRect(memDc, 12, 218, 188, 76, panel);
+    strokeRect(memDc, 12, 218, 188, 76, line);
+    drawText(memDc, L"RACE / PIT", 24, 228, 160, 12, tiny, muted, DT_LEFT);
+    drawInfoCell(memDc, L"session", sessionTypeText(s.sessionType), 24, 246, 64, tiny, value);
+    drawInfoCell(memDc, L"time", formatClock(s.sessionTimeLeft), 94, 246, 48, tiny, value);
+    drawInfoCell(memDc, L"flags", safetyCarText(s.safetyCarStatus) != L"CLEAR" ? safetyCarText(s.safetyCarStatus) : flagsText(s.vehicleFiaFlags), 148, 246, 42, tiny, value,
+        s.safetyCarStatus || s.vehicleFiaFlags == 3 || s.vehicleFiaFlags == 4 ? rgb(245, 213, 71) : rgb(245, 245, 243));
+    std::wstring pitWindow = s.pitStopWindowIdealLap ? std::to_wstring(s.pitStopWindowIdealLap) + L"-" + std::to_wstring(s.pitStopWindowLatestLap) : L"--";
+    drawInfoCell(memDc, L"pit win", pitWindow, 24, 272, 56, tiny, value);
+    drawInfoCell(memDc, L"rejoin", s.pitStopRejoinPosition ? std::to_wstring(s.pitStopRejoinPosition) : L"--", 88, 272, 48, tiny, value);
+    drawInfoCell(memDc, L"limit", s.pitSpeedLimit ? std::to_wstring(s.pitSpeedLimit) : L"--", 144, 272, 44, tiny, value);
+
+    fillRect(memDc, 212, 218, 236, 76, panel);
+    strokeRect(memDc, 212, 218, 236, 76, line);
+    drawText(memDc, L"TYRE HEALTH", 224, 228, 112, 12, tiny, muted, DT_LEFT);
+    uint16_t maxBrake = 0;
+    for (uint16_t brakeTemp : s.brakeTemps) {
+        if (brakeTemp > maxBrake) maxBrake = brakeTemp;
+    }
+    drawText(memDc, L"brk " + std::to_wstring(maxBrake) + L"C", 360, 228, 74, 12, tiny, brakeColor(maxBrake), DT_RIGHT);
+    drawTyreCorner(memDc, L"FL", s.tyreSurfaceTemps[2], s.tyreWear[2], s.tyreBlisters[2], 224, 248, 104, tiny, value);
+    drawTyreCorner(memDc, L"FR", s.tyreSurfaceTemps[3], s.tyreWear[3], s.tyreBlisters[3], 334, 248, 104, tiny, value);
+    drawTyreCorner(memDc, L"RL", s.tyreSurfaceTemps[0], s.tyreWear[0], s.tyreBlisters[0], 224, 272, 104, tiny, value);
+    drawTyreCorner(memDc, L"RR", s.tyreSurfaceTemps[1], s.tyreWear[1], s.tyreBlisters[1], 334, 272, 104, tiny, value);
+
+    fillRect(memDc, 460, 218, 148, 76, panel);
+    strokeRect(memDc, 460, 218, 148, 76, line);
+    drawText(memDc, L"WARNINGS", 472, 228, 120, 12, tiny, muted, DT_LEFT);
+    std::wstring alert = warningText(s, ersPct);
+    COLORREF alertColor = alert == L"NOMINAL" ? rgb(35, 243, 106) : rgb(255, 74, 74);
+    if (alert == L"DRS READY" || alert == L"AERO READY") alertColor = rgb(245, 213, 71);
+    if (alert == L"SC" || alert == L"VSC" || alert == L"FORM") alertColor = rgb(245, 213, 71);
+    drawText(memDc, alert, 472, 248, 124, 20, value, alertColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"ERS", 472, 274, 30, 12, tiny, muted, DT_LEFT);
+    fillRect(memDc, 504, 277, 78, 7, rgb(35, 35, 35));
+    fillRect(memDc, 504, 277, static_cast<int>(78 * ers), 7, ersPct <= 10.0f ? rgb(255, 74, 74) : rgb(35, 243, 106));
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ersPct))) + L"%", 584, 272, 20, 14, tiny, rgb(245, 245, 243), DT_RIGHT);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -740,7 +920,7 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 308, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
