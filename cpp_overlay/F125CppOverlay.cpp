@@ -565,36 +565,38 @@ void paintHud(HWND hwnd) {
     swprintf_s(rpmBuf, L"%05u", s.rpm);
     drawText(memDc, rpmBuf, 252, 72, 104, 26, med, rgb(245, 245, 243), DT_LEFT);
 
-    fillRect(memDc, 428, 12, 180, 92, panel);
-    strokeRect(memDc, 428, 12, 180, 92, line);
+    fillRect(memDc, 428, 12, 180, 100, panel);
+    strokeRect(memDc, 428, 12, 180, 100, line);
     drawText(memDc, regulationTitle(), 442, 21, 72, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 38, 72, 26, med, accent, DT_LEFT);
-    drawText(memDc, wingText(s), 522, 40, 72, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    fillRect(memDc, 442, 72, 148, 8, rgb(35, 35, 35));
-    fillRect(memDc, 442, 72, static_cast<int>(148 * ers), 8, accent);
-    drawText(memDc, ersModeText(s.ersMode), 442, 84, 70, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 520, 84, 70, 12, tiny, rgb(245, 245, 243), DT_RIGHT);
+    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 37, 72, 28, med, accent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, wingText(s), 522, 40, 72, 22, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(memDc, 442, 78, 148, 8, rgb(35, 35, 35));
+    fillRect(memDc, 442, 78, static_cast<int>(148 * ers), 8, accent);
+    drawText(memDc, ersModeText(s.ersMode), 442, 91, 70, 12, tiny, muted, DT_LEFT);
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 520, 91, 70, 12, tiny, rgb(245, 245, 243), DT_RIGHT);
 
-    fillRect(memDc, 12, 116, 596, 42, panel);
-    strokeRect(memDc, 12, 116, 596, 42, line);
+    fillRect(memDc, 12, 122, 596, 42, panel);
+    strokeRect(memDc, 12, 122, 596, 42, line);
     wchar_t pen[16];
     swprintf_s(pen, L"%us / %uw", s.penalties, s.warnings);
     wchar_t fuel[16];
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
     wchar_t est[16];
     swprintf_s(est, L"%.1f", s.fuelLaps);
-    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 24, 120, 40, small, value);
-    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 70, 120, 40, small, value);
-    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 116, 120, 40, small, value);
-    drawChip(memDc, L"pen", pen, 168, 120, 82, small, value);
-    drawChip(memDc, L"fuel", fuel, 262, 120, 66, small, value);
-    drawChip(memDc, L"est", est, 340, 120, 56, small, value);
-    drawChip(memDc, L"ers", ersModeText(s.ersMode), 408, 120, 78, small, value);
-    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 498, 120, 88, small, value);
+    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 24, 126, 40, small, value);
+    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 70, 126, 40, small, value);
+    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 116, 126, 40, small, value);
+    drawChip(memDc, L"pen", pen, 168, 126, 82, small, value);
+    drawChip(memDc, L"fuel", fuel, 262, 126, 66, small, value);
+    drawChip(memDc, L"est", est, 340, 126, 56, small, value);
+    drawChip(memDc, L"ers", ersModeText(s.ersMode), 408, 126, 78, small, value);
+    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 498, 126, 88, small, value);
 
-    drawBar(memDc, L"thr", s.throttle, 18, 176, 178, rgb(35, 243, 106), tiny);
-    drawBar(memDc, L"brk", s.brake, 220, 176, 178, rgb(255, 74, 74), tiny);
-    drawSteer(memDc, s.steer, 422, 176, 178, tiny);
+    fillRect(memDc, 12, 176, 596, 30, panel);
+    strokeRect(memDc, 12, 176, 596, 30, line);
+    drawBar(memDc, L"thr", s.throttle, 24, 188, 172, rgb(35, 243, 106), tiny);
+    drawBar(memDc, L"brk", s.brake, 224, 188, 172, rgb(255, 74, 74), tiny);
+    drawSteer(memDc, s.steer, 424, 188, 172, tiny);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -725,7 +727,7 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 210, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
