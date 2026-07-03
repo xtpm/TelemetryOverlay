@@ -278,6 +278,14 @@ COLORREF wearColor(float wear) {
     return RGB(35, 243, 106);
 }
 
+COLORREF rgbCycleColor() {
+    double t = GetTickCount64() / 320.0;
+    int r = static_cast<int>(128 + 127 * std::sin(t));
+    int g = static_cast<int>(128 + 127 * std::sin(t + 2.09439510239));
+    int b = static_cast<int>(128 + 127 * std::sin(t + 4.18879020479));
+    return RGB(r, g, b);
+}
+
 const wchar_t* regulationTitle() {
     return g_regulationMode == RegulationMode::Reg2025 ? L"2025 regs" : L"2026 regs";
 }
@@ -692,7 +700,10 @@ void paintHud(HWND hwnd) {
     COLORREF panel = rgb(8, 9, 11);
     COLORREF line = rgb(58, 58, 56);
     COLORREF muted = rgb(150, 150, 144);
-    COLORREF systemColor = regulationSystemActive(s) ? rgb(35, 243, 106) : rgb(255, 74, 74);
+    bool systemActive = regulationSystemActive(s);
+    COLORREF systemColor = systemActive ? rgb(35, 243, 106) : rgb(255, 74, 74);
+    std::wstring systemLabel = g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : (s.activeAeroMode ? L"STRAIGHT" : L"CORNER");
+    if (g_regulationMode == RegulationMode::Reg2026) systemColor = s.activeAeroMode ? rgbCycleColor() : rgb(255, 74, 74);
     float ersPct = ers * 100.0f;
     COLORREF ersColor = s.ersFault || ersPct <= 10.0f ? rgb(255, 74, 74) : accent;
 
@@ -729,7 +740,7 @@ void paintHud(HWND hwnd) {
     fillRect(memDc, 428, 12, 180, 100, panel);
     strokeRect(memDc, 428, 12, 180, 100, line);
     drawText(memDc, regulationTitle(), 442, 20, 72, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 34, 72, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, systemLabel, 442, 34, 92, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, wingText(s), 522, 37, 72, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
     fillRect(memDc, 442, 63, 148, 1, line);
     drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, ersColor, DT_LEFT);
