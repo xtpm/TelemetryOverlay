@@ -177,6 +177,10 @@ std::wstring wingText(const TelemetryState& s) {
     return L"--";
 }
 
+bool regulationSystemActive(const TelemetryState& s) {
+    return g_regulationMode == RegulationMode::Reg2025 ? s.drsActive != 0 : s.activeAeroMode != 0;
+}
+
 const wchar_t* regulationTitle() {
     return g_regulationMode == RegulationMode::Reg2025 ? L"2025 regs" : L"2026 regs";
 }
@@ -534,6 +538,7 @@ void paintHud(HWND hwnd) {
     COLORREF panel = rgb(8, 9, 11);
     COLORREF line = rgb(58, 58, 56);
     COLORREF muted = rgb(150, 150, 144);
+    COLORREF systemColor = regulationSystemActive(s) ? rgb(35, 243, 106) : rgb(255, 74, 74);
 
     fillRect(memDc, 12, 12, 94, 92, panel);
     strokeRect(memDc, 12, 12, 94, 92, line);
@@ -568,8 +573,8 @@ void paintHud(HWND hwnd) {
     fillRect(memDc, 428, 12, 180, 100, panel);
     strokeRect(memDc, 428, 12, 180, 100, line);
     drawText(memDc, regulationTitle(), 442, 20, 72, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 34, 72, 26, med, accent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, wingText(s), 522, 37, 72, 20, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 34, 72, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, wingText(s), 522, 37, 72, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
     fillRect(memDc, 442, 63, 148, 1, line);
     drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, muted, DT_LEFT);
     drawText(memDc, ersModeText(s.ersMode), 480, 70, 56, 11, tiny, muted, DT_LEFT);
