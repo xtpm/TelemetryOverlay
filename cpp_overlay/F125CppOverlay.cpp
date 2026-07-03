@@ -107,6 +107,7 @@ HWND g_hud = nullptr;
 HWND g_timing = nullptr;
 HWND g_info = nullptr;
 HINSTANCE g_instance = nullptr;
+HANDLE g_exoFont = nullptr;
 
 enum class RegulationMode {
     Reg2025,
@@ -321,7 +322,19 @@ void strokeRect(HDC dc, int x, int y, int w, int h, COLORREF color) {
     DeleteObject(pen);
 }
 
-HFONT makeFont(int size, int weight = FW_BOLD, const wchar_t* face = L"Bahnschrift") {
+void loadEmbeddedFont() {
+    HRSRC resource = FindResourceW(g_instance, MAKEINTRESOURCEW(IDR_EXO2_FONT), RT_RCDATA);
+    if (!resource) return;
+    HGLOBAL loaded = LoadResource(g_instance, resource);
+    if (!loaded) return;
+    void* data = LockResource(loaded);
+    DWORD size = SizeofResource(g_instance, resource);
+    if (!data || !size) return;
+    DWORD fonts = 0;
+    g_exoFont = AddFontMemResourceEx(data, size, nullptr, &fonts);
+}
+
+HFONT makeFont(int size, int weight = FW_BOLD, const wchar_t* face = L"Exo 2") {
     return CreateFontW(-size, 0, 0, 0, weight, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, face);
 }
@@ -691,9 +704,9 @@ void paintHud(HWND hwnd) {
 
     HFONT tiny = makeFont(8, FW_BOLD);
     HFONT small = makeFont(9, FW_BOLD);
-    HFONT value = makeFont(12, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT big = makeFont(46, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT med = makeFont(25, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT value = makeFont(12, FW_BOLD, L"Exo 2");
+    HFONT big = makeFont(46, FW_BOLD, L"Exo 2");
+    HFONT med = makeFont(25, FW_BOLD, L"Exo 2");
 
     float ers = clampf(s.ersEnergy / static_cast<float>(ERS_MAX_JOULES), 0, 1);
     COLORREF accent = g_regulationMode == RegulationMode::Reg2025 ? rgb(245, 213, 71) : rgb(35, 243, 106);
@@ -805,7 +818,7 @@ void paintInfo(HWND hwnd) {
     }
 
     HFONT tiny = makeFont(8, FW_BOLD);
-    HFONT value = makeFont(11, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT value = makeFont(11, FW_BOLD, L"Exo 2");
     COLORREF panel = rgb(8, 9, 11);
     COLORREF line = rgb(58, 58, 56);
     COLORREF muted = rgb(150, 150, 144);
@@ -877,8 +890,8 @@ void paintTiming(HWND hwnd) {
     }
 
     HFONT small = makeFont(12, FW_BOLD);
-    HFONT value = makeFont(16, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT sectorFont = makeFont(14, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT value = makeFont(16, FW_BOLD, L"Exo 2");
+    HFONT sectorFont = makeFont(14, FW_BOLD, L"Exo 2");
 
     uint32_t best = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
     int delta = s.stableDeltaMs;
@@ -1022,7 +1035,7 @@ void paintLauncher(HWND hwnd) {
     strokeRect(memDc, 8, 8, rc.right - 16, rc.bottom - 16, rgb(34, 34, 34));
     fillRect(memDc, 24, 24, 4, 64, rgb(35, 243, 106));
 
-    HFONT title = makeFont(28, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT title = makeFont(28, FW_BOLD, L"Exo 2");
     HFONT logo = makeFont(18, FW_BOLD);
     HFONT label = makeFont(11, FW_BOLD);
     HFONT body = makeFont(10, FW_BOLD);
@@ -1123,6 +1136,7 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     g_instance = hInstance;
+    loadEmbeddedFont();
     std::thread network(udpThread);
 
     WNDCLASSW wc{};
@@ -1147,5 +1161,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     g_running = false;
     if (network.joinable()) network.join();
+    if (g_exoFont) RemoveFontMemResourceEx(g_exoFont);
     return 0;
 }
