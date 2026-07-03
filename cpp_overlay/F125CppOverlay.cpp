@@ -236,6 +236,12 @@ void drawChip(HDC dc, const wchar_t* label, const std::wstring& value, int x, in
     drawText(dc, value, x + 3, y + 17, w - 6, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
+void drawStatCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont, bool divider) {
+    if (divider) fillRect(dc, x, y + 7, 1, 26, rgb(58, 58, 56));
+    drawText(dc, label, x + 8, y + 5, w - 16, 10, small, rgb(160, 160, 154), DT_CENTER);
+    drawText(dc, value, x + 8, y + 18, w - 16, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+}
+
 void drawBar(HDC dc, const wchar_t* label, float value, int x, int y, int w, COLORREF color, HFONT font) {
     drawText(dc, label, x, y - 1, 28, 12, font, rgb(167, 167, 162), DT_LEFT);
     fillRect(dc, x + 34, y + 3, w - 68, 8, rgb(39, 39, 39));
@@ -590,14 +596,14 @@ void paintHud(HWND hwnd) {
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
     wchar_t est[16];
     swprintf_s(est, L"%.1f", s.fuelLaps);
-    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 24, 126, 40, small, value);
-    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 70, 126, 40, small, value);
-    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 116, 126, 40, small, value);
-    drawChip(memDc, L"pen", pen, 168, 126, 82, small, value);
-    drawChip(memDc, L"fuel", fuel, 262, 126, 66, small, value);
-    drawChip(memDc, L"est", est, 340, 126, 56, small, value);
-    drawChip(memDc, L"ers", ersModeText(s.ersMode), 408, 126, 78, small, value);
-    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 498, 126, 88, small, value);
+    drawStatCell(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 18, 124, 44, small, value, false);
+    drawStatCell(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 62, 124, 44, small, value, true);
+    drawStatCell(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 106, 124, 44, small, value, true);
+    drawStatCell(memDc, L"pen", pen, 150, 124, 92, small, value, true);
+    drawStatCell(memDc, L"fuel", fuel, 242, 124, 74, small, value, true);
+    drawStatCell(memDc, L"est", est, 316, 124, 64, small, value, true);
+    drawStatCell(memDc, L"ers", ersModeText(s.ersMode), 380, 124, 94, small, value, true);
+    drawStatCell(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 474, 124, 128, small, value, true);
 
     fillRect(memDc, 12, 176, 596, 30, panel);
     strokeRect(memDc, 12, 176, 596, 30, line);
