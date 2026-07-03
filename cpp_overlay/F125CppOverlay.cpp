@@ -105,6 +105,7 @@ std::mutex g_stateMutex;
 std::atomic<bool> g_running{true};
 HWND g_hud = nullptr;
 HWND g_timing = nullptr;
+HWND g_info = nullptr;
 HINSTANCE g_instance = nullptr;
 
 enum class RegulationMode {
@@ -229,12 +230,17 @@ std::wstring flagsText(int8_t flags) {
 std::wstring warningText(const TelemetryState& s, float ersPct) {
     if (s.drsFault) return L"DRS FAULT";
     if (s.ersFault) return L"ERS FAULT";
-    if (ersPct <= 10.0f) return L"ERS LOW";
     if (g_regulationMode == RegulationMode::Reg2025 && s.drsAllowed) return L"DRS READY";
     if (g_regulationMode == RegulationMode::Reg2026 && s.activeAeroAvailable) return L"AERO READY";
     if (s.safetyCarStatus) return safetyCarText(s.safetyCarStatus);
     if (s.vehicleFiaFlags == 3 || s.vehicleFiaFlags == 4) return flagsText(s.vehicleFiaFlags);
     return L"NOMINAL";
+}
+
+std::wstring ersStatusText(const TelemetryState& s, float ersPct) {
+    if (s.ersFault) return L"fault";
+    if (ersPct <= 10.0f) return L"low";
+    return ersModeText(s.ersMode);
 }
 
 std::wstring wingText(const TelemetryState& s) {
@@ -649,6 +655,7 @@ LRESULT CALLBACK overlayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_DESTROY) {
         if (hwnd == g_hud) g_hud = nullptr;
         if (hwnd == g_timing) g_timing = nullptr;
+        if (hwnd == g_info) g_info = nullptr;
         return 0;
     }
     return DefWindowProc(hwnd, msg, wp, lp);
@@ -687,6 +694,7 @@ void paintHud(HWND hwnd) {
     COLORREF muted = rgb(150, 150, 144);
     COLORREF systemColor = regulationSystemActive(s) ? rgb(35, 243, 106) : rgb(255, 74, 74);
     float ersPct = ers * 100.0f;
+    COLORREF ersColor = s.ersFault || ersPct <= 10.0f ? rgb(255, 74, 74) : accent;
 
     fillRect(memDc, 12, 12, 94, 92, panel);
     strokeRect(memDc, 12, 12, 94, 92, line);
@@ -724,11 +732,11 @@ void paintHud(HWND hwnd) {
     drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 34, 72, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, wingText(s), 522, 37, 72, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
     fillRect(memDc, 442, 63, 148, 1, line);
-    drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, muted, DT_LEFT);
-    drawText(memDc, ersModeText(s.ersMode), 480, 70, 56, 11, tiny, muted, DT_LEFT);
-    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 540, 70, 50, 11, tiny, rgb(245, 245, 243), DT_RIGHT);
+    drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, ersColor, DT_LEFT);
+    drawText(memDc, ersStatusText(s, ersPct), 480, 70, 56, 11, tiny, ersColor, DT_LEFT);
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ersPct))) + L"%", 540, 70, 50, 11, tiny, ersColor, DT_RIGHT);
     fillRect(memDc, 442, 87, 148, 9, rgb(35, 35, 35));
-    fillRect(memDc, 442, 87, static_cast<int>(148 * ers), 9, accent);
+    fillRect(memDc, 442, 87, static_cast<int>(148 * ers), 9, ersColor);
 
     fillRect(memDc, 12, 122, 596, 42, panel);
     strokeRect(memDc, 12, 122, 596, 42, line);
@@ -744,7 +752,7 @@ void paintHud(HWND hwnd) {
     drawStatCell(memDc, L"pen", pen, 150, 124, 92, small, value, true);
     drawStatCell(memDc, L"fuel", fuel, 242, 124, 74, small, value, true);
     drawStatCell(memDc, L"est", est, 316, 124, 64, small, value, true);
-    drawStatCell(memDc, L"ers", ersModeText(s.ersMode), 380, 124, 94, small, value, true);
+    drawStatCell(memDc, L"ers", ersStatusText(s, ersPct), 380, 124, 94, small, value, true);
     drawStatCell(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 474, 124, 128, small, value, true);
 
     fillRect(memDc, 12, 176, 596, 30, panel);
@@ -753,44 +761,6 @@ void paintHud(HWND hwnd) {
     drawBar(memDc, L"brk", s.brake, 224, 188, 172, rgb(255, 74, 74), tiny);
     drawSteer(memDc, s.steer, 424, 188, 172, tiny);
 
-    fillRect(memDc, 12, 218, 188, 76, panel);
-    strokeRect(memDc, 12, 218, 188, 76, line);
-    drawText(memDc, L"RACE / PIT", 24, 228, 160, 12, tiny, muted, DT_LEFT);
-    drawInfoCell(memDc, L"session", sessionTypeText(s.sessionType), 24, 246, 64, tiny, value);
-    drawInfoCell(memDc, L"time", formatClock(s.sessionTimeLeft), 94, 246, 48, tiny, value);
-    drawInfoCell(memDc, L"flags", safetyCarText(s.safetyCarStatus) != L"CLEAR" ? safetyCarText(s.safetyCarStatus) : flagsText(s.vehicleFiaFlags), 148, 246, 42, tiny, value,
-        s.safetyCarStatus || s.vehicleFiaFlags == 3 || s.vehicleFiaFlags == 4 ? rgb(245, 213, 71) : rgb(245, 245, 243));
-    std::wstring pitWindow = s.pitStopWindowIdealLap ? std::to_wstring(s.pitStopWindowIdealLap) + L"-" + std::to_wstring(s.pitStopWindowLatestLap) : L"--";
-    drawInfoCell(memDc, L"pit win", pitWindow, 24, 272, 56, tiny, value);
-    drawInfoCell(memDc, L"rejoin", s.pitStopRejoinPosition ? std::to_wstring(s.pitStopRejoinPosition) : L"--", 88, 272, 48, tiny, value);
-    drawInfoCell(memDc, L"limit", s.pitSpeedLimit ? std::to_wstring(s.pitSpeedLimit) : L"--", 144, 272, 44, tiny, value);
-
-    fillRect(memDc, 212, 218, 236, 76, panel);
-    strokeRect(memDc, 212, 218, 236, 76, line);
-    drawText(memDc, L"TYRE HEALTH", 224, 228, 112, 12, tiny, muted, DT_LEFT);
-    uint16_t maxBrake = 0;
-    for (uint16_t brakeTemp : s.brakeTemps) {
-        if (brakeTemp > maxBrake) maxBrake = brakeTemp;
-    }
-    drawText(memDc, L"brk " + std::to_wstring(maxBrake) + L"C", 360, 228, 74, 12, tiny, brakeColor(maxBrake), DT_RIGHT);
-    drawTyreCorner(memDc, L"FL", s.tyreSurfaceTemps[2], s.tyreWear[2], s.tyreBlisters[2], 224, 248, 104, tiny, value);
-    drawTyreCorner(memDc, L"FR", s.tyreSurfaceTemps[3], s.tyreWear[3], s.tyreBlisters[3], 334, 248, 104, tiny, value);
-    drawTyreCorner(memDc, L"RL", s.tyreSurfaceTemps[0], s.tyreWear[0], s.tyreBlisters[0], 224, 272, 104, tiny, value);
-    drawTyreCorner(memDc, L"RR", s.tyreSurfaceTemps[1], s.tyreWear[1], s.tyreBlisters[1], 334, 272, 104, tiny, value);
-
-    fillRect(memDc, 460, 218, 148, 76, panel);
-    strokeRect(memDc, 460, 218, 148, 76, line);
-    drawText(memDc, L"WARNINGS", 472, 228, 120, 12, tiny, muted, DT_LEFT);
-    std::wstring alert = warningText(s, ersPct);
-    COLORREF alertColor = alert == L"NOMINAL" ? rgb(35, 243, 106) : rgb(255, 74, 74);
-    if (alert == L"DRS READY" || alert == L"AERO READY") alertColor = rgb(245, 213, 71);
-    if (alert == L"SC" || alert == L"VSC" || alert == L"FORM") alertColor = rgb(245, 213, 71);
-    drawText(memDc, alert, 472, 248, 124, 20, value, alertColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"ERS", 472, 274, 30, 12, tiny, muted, DT_LEFT);
-    fillRect(memDc, 504, 277, 78, 7, rgb(35, 35, 35));
-    fillRect(memDc, 504, 277, static_cast<int>(78 * ers), 7, ersPct <= 10.0f ? rgb(255, 74, 74) : rgb(35, 243, 106));
-    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ersPct))) + L"%", 584, 272, 20, 14, tiny, rgb(245, 245, 243), DT_RIGHT);
-
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
     DeleteObject(tiny);
@@ -798,6 +768,81 @@ void paintHud(HWND hwnd) {
     DeleteObject(value);
     DeleteObject(big);
     DeleteObject(med);
+    SelectObject(memDc, oldBitmap);
+    DeleteObject(memBitmap);
+    DeleteDC(memDc);
+    EndPaint(hwnd, &ps);
+}
+
+void paintInfo(HWND hwnd) {
+    PAINTSTRUCT ps;
+    HDC dc = BeginPaint(hwnd, &ps);
+    RECT rc{};
+    GetClientRect(hwnd, &rc);
+    HDC memDc = CreateCompatibleDC(dc);
+    HBITMAP memBitmap = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
+    HGDIOBJ oldBitmap = SelectObject(memDc, memBitmap);
+
+    fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(3, 4, 5));
+    strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(116, 116, 110));
+    strokeRect(memDc, 6, 6, rc.right - 12, rc.bottom - 12, rgb(34, 34, 34));
+
+    TelemetryState s;
+    {
+        std::lock_guard<std::mutex> lock(g_stateMutex);
+        s = g_state;
+    }
+
+    HFONT tiny = makeFont(8, FW_BOLD);
+    HFONT value = makeFont(12, FW_BOLD, L"Bahnschrift SemiCondensed");
+    COLORREF panel = rgb(8, 9, 11);
+    COLORREF line = rgb(58, 58, 56);
+    COLORREF muted = rgb(150, 150, 144);
+    float ers = clampf(s.ersEnergy / static_cast<float>(ERS_MAX_JOULES), 0, 1);
+    float ersPct = ers * 100.0f;
+
+    fillRect(memDc, 12, 12, 188, 76, panel);
+    strokeRect(memDc, 12, 12, 188, 76, line);
+    drawText(memDc, L"RACE / PIT", 24, 22, 160, 12, tiny, muted, DT_LEFT);
+    drawInfoCell(memDc, L"session", sessionTypeText(s.sessionType), 24, 40, 64, tiny, value);
+    drawInfoCell(memDc, L"time", formatClock(s.sessionTimeLeft), 94, 40, 48, tiny, value);
+    drawInfoCell(memDc, L"flags", safetyCarText(s.safetyCarStatus) != L"CLEAR" ? safetyCarText(s.safetyCarStatus) : flagsText(s.vehicleFiaFlags), 148, 40, 42, tiny, value,
+        s.safetyCarStatus || s.vehicleFiaFlags == 3 || s.vehicleFiaFlags == 4 ? rgb(245, 213, 71) : rgb(245, 245, 243));
+    std::wstring pitWindow = s.pitStopWindowIdealLap ? std::to_wstring(s.pitStopWindowIdealLap) + L"-" + std::to_wstring(s.pitStopWindowLatestLap) : L"--";
+    drawInfoCell(memDc, L"pit win", pitWindow, 24, 66, 56, tiny, value);
+    drawInfoCell(memDc, L"rejoin", s.pitStopRejoinPosition ? std::to_wstring(s.pitStopRejoinPosition) : L"--", 88, 66, 48, tiny, value);
+    drawInfoCell(memDc, L"limit", s.pitSpeedLimit ? std::to_wstring(s.pitSpeedLimit) : L"--", 144, 66, 44, tiny, value);
+
+    fillRect(memDc, 212, 12, 236, 76, panel);
+    strokeRect(memDc, 212, 12, 236, 76, line);
+    drawText(memDc, L"TYRE HEALTH", 224, 22, 112, 12, tiny, muted, DT_LEFT);
+    uint16_t maxBrake = 0;
+    for (uint16_t brakeTemp : s.brakeTemps) {
+        if (brakeTemp > maxBrake) maxBrake = brakeTemp;
+    }
+    drawText(memDc, L"brk " + std::to_wstring(maxBrake) + L"C", 360, 22, 74, 12, tiny, brakeColor(maxBrake), DT_RIGHT);
+    drawTyreCorner(memDc, L"FL", s.tyreSurfaceTemps[2], s.tyreWear[2], s.tyreBlisters[2], 224, 42, 104, tiny, value);
+    drawTyreCorner(memDc, L"FR", s.tyreSurfaceTemps[3], s.tyreWear[3], s.tyreBlisters[3], 334, 42, 104, tiny, value);
+    drawTyreCorner(memDc, L"RL", s.tyreSurfaceTemps[0], s.tyreWear[0], s.tyreBlisters[0], 224, 66, 104, tiny, value);
+    drawTyreCorner(memDc, L"RR", s.tyreSurfaceTemps[1], s.tyreWear[1], s.tyreBlisters[1], 334, 66, 104, tiny, value);
+
+    fillRect(memDc, 460, 12, 148, 76, panel);
+    strokeRect(memDc, 460, 12, 148, 76, line);
+    drawText(memDc, L"WARNINGS", 472, 22, 120, 12, tiny, muted, DT_LEFT);
+    std::wstring alert = warningText(s, ersPct);
+    COLORREF alertColor = alert == L"NOMINAL" ? rgb(35, 243, 106) : rgb(255, 74, 74);
+    if (alert == L"DRS READY" || alert == L"AERO READY") alertColor = rgb(245, 213, 71);
+    if (alert == L"SC" || alert == L"VSC" || alert == L"FORM") alertColor = rgb(245, 213, 71);
+    drawText(memDc, alert, 472, 42, 124, 20, value, alertColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawInfoCell(memDc, L"faults", (s.drsFault || s.ersFault) ? L"check" : L"none", 472, 66, 58, tiny, value,
+        (s.drsFault || s.ersFault) ? rgb(255, 74, 74) : rgb(245, 245, 243));
+    drawInfoCell(memDc, L"ers", ersStatusText(s, ersPct), 536, 66, 58, tiny, value,
+        (s.ersFault || ersPct <= 10.0f) ? rgb(255, 74, 74) : rgb(245, 245, 243));
+
+    BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
+
+    DeleteObject(tiny);
+    DeleteObject(value);
     SelectObject(memDc, oldBitmap);
     DeleteObject(memBitmap);
     DeleteDC(memDc);
@@ -879,6 +924,14 @@ LRESULT CALLBACK timingProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return overlayProc(hwnd, msg, wp, lp);
 }
 
+LRESULT CALLBACK infoProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_PAINT) {
+        paintInfo(hwnd);
+        return 0;
+    }
+    return overlayProc(hwnd, msg, wp, lp);
+}
+
 HWND createOverlayWindow(const wchar_t* cls, const wchar_t* title, int x, int y, int w, int h, WNDPROC proc) {
     WNDCLASSW wc{};
     wc.lpfnWndProc = proc;
@@ -920,10 +973,13 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 308, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
+    }
+    if (!g_info) {
+        g_info = createOverlayWindow(L"F125CppInfo", L"Info", 82, 182, 620, 100, infoProc);
     }
 }
 
