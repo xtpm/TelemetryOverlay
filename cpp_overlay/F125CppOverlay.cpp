@@ -525,60 +525,76 @@ void paintHud(HWND hwnd) {
 
     HFONT tiny = makeFont(8, FW_BOLD);
     HFONT small = makeFont(9, FW_BOLD);
-    HFONT value = makeFont(11, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT big = makeFont(38, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT med = makeFont(27, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT value = makeFont(12, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT big = makeFont(46, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT med = makeFont(29, FW_BOLD, L"Bahnschrift SemiCondensed");
 
     float ers = clampf(s.ersEnergy / static_cast<float>(ERS_MAX_JOULES), 0, 1);
-    COLORREF gearFill = ers >= 0.99f ? rgb(35, 243, 106) : rgb(20, 82, 43);
-    fillRect(memDc, 12, 14, static_cast<int>(68 * ers), 58, gearFill);
-    strokeRect(memDc, 12, 14, 68, 58, rgb(64, 64, 64));
-    drawText(memDc, gearText(s.gear), 12, 20, 68, 44, big, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    COLORREF accent = g_regulationMode == RegulationMode::Reg2025 ? rgb(245, 213, 71) : rgb(35, 243, 106);
+    COLORREF panel = rgb(8, 9, 11);
+    COLORREF line = rgb(58, 58, 56);
+    COLORREF muted = rgb(150, 150, 144);
 
-    drawText(memDc, L"r_", 92, 10, 22, 16, small, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 120, 11, 112, 14, tiny, rgb(110, 110, 104), DT_LEFT);
-    drawText(memDc, regulationTitle(), 432, 10, 96, 14, tiny, rgb(245, 213, 71), DT_RIGHT);
+    fillRect(memDc, 12, 12, 94, 92, panel);
+    strokeRect(memDc, 12, 12, 94, 92, line);
+    fillRect(memDc, 12, 12, 4, 92, accent);
+    drawText(memDc, L"GEAR", 24, 21, 70, 11, tiny, muted, DT_CENTER);
+    drawText(memDc, gearText(s.gear), 22, 32, 76, 58, big, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    fillRect(memDc, 116, 12, 302, 92, panel);
+    strokeRect(memDc, 116, 12, 302, 92, line);
+    drawText(memDc, L"r_", 128, 20, 24, 16, small, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 154, 21, 112, 14, tiny, muted, DT_LEFT);
     if (s.packetFormat) {
         std::wstring udpFormat = L"udp " + std::to_wstring(s.packetFormat);
-        drawText(memDc, udpFormat, 338, 10, 76, 14, tiny, rgb(167, 167, 162), DT_RIGHT);
+        drawText(memDc, udpFormat, 330, 21, 76, 14, tiny, muted, DT_RIGHT);
     }
 
-    int revX = 92;
-    int lit = static_cast<int>(std::round(clampf(s.revLights / 100.0f, 0, 1) * 18));
-    for (int i = 0; i < 18; ++i) {
-        COLORREF c = rgb(44, 44, 44);
-        if (i < lit) c = i < 12 ? rgb(35, 243, 106) : i < 15 ? rgb(245, 213, 71) : rgb(255, 74, 74);
-        fillRect(memDc, revX + i * 20, 32, 17, 7, c);
+    int revX = 128;
+    int lit = static_cast<int>(std::round(clampf(s.revLights / 100.0f, 0, 1) * 20));
+    for (int i = 0; i < 20; ++i) {
+        COLORREF c = rgb(39, 39, 39);
+        if (i < lit) c = i < 12 ? rgb(35, 243, 106) : i < 16 ? rgb(245, 213, 71) : rgb(255, 74, 74);
+        fillRect(memDc, revX + i * 13, 42, 10, 8, c);
     }
 
-    drawText(memDc, L"KM/H", 92, 48, 60, 10, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, std::to_wstring(s.speed), 92, 58, 74, 28, med, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"RPM", 190, 48, 60, 10, small, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"KM/H", 128, 61, 48, 10, small, muted, DT_LEFT);
+    drawText(memDc, std::to_wstring(s.speed), 128, 72, 92, 26, med, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"RPM", 252, 61, 48, 10, small, muted, DT_LEFT);
     wchar_t rpmBuf[16];
     swprintf_s(rpmBuf, L"%05u", s.rpm);
-    drawText(memDc, rpmBuf, 190, 58, 94, 28, med, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, rpmBuf, 252, 72, 104, 26, med, rgb(245, 245, 243), DT_LEFT);
 
-    fillRect(memDc, 0, 86, rc.right, 1, rgb(28, 28, 28));
-    int y = 94;
-    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 12, y, 36, small, value);
-    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 54, y, 36, small, value);
-    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 96, y, 36, small, value);
+    fillRect(memDc, 428, 12, 180, 92, panel);
+    strokeRect(memDc, 428, 12, 180, 92, line);
+    drawText(memDc, regulationTitle(), 442, 21, 72, 12, tiny, muted, DT_LEFT);
+    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 38, 72, 26, med, accent, DT_LEFT);
+    drawText(memDc, wingText(s), 522, 40, 72, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(memDc, 442, 72, 148, 8, rgb(35, 35, 35));
+    fillRect(memDc, 442, 72, static_cast<int>(148 * ers), 8, accent);
+    drawText(memDc, ersModeText(s.ersMode), 442, 84, 70, 12, tiny, muted, DT_LEFT);
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 520, 84, 70, 12, tiny, rgb(245, 245, 243), DT_RIGHT);
+
+    fillRect(memDc, 12, 116, 596, 42, panel);
+    strokeRect(memDc, 12, 116, 596, 42, line);
     wchar_t pen[16];
     swprintf_s(pen, L"%us / %uw", s.penalties, s.warnings);
-    drawChip(memDc, L"pen", pen, 138, y, 76, small, value);
-    drawChip(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"drs" : L"wing", wingText(s), 220, y, 68, small, value);
     wchar_t fuel[16];
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
-    drawChip(memDc, L"fuel", fuel, 294, y, 58, small, value);
     wchar_t est[16];
     swprintf_s(est, L"%.1f", s.fuelLaps);
-    drawChip(memDc, L"est", est, 358, y, 50, small, value);
-    drawChip(memDc, L"ers", ersModeText(s.ersMode), 414, y, 74, small, value);
-    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 494, y, 58, small, value);
+    drawChip(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 24, 120, 40, small, value);
+    drawChip(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 70, 120, 40, small, value);
+    drawChip(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 116, 120, 40, small, value);
+    drawChip(memDc, L"pen", pen, 168, 120, 82, small, value);
+    drawChip(memDc, L"fuel", fuel, 262, 120, 66, small, value);
+    drawChip(memDc, L"est", est, 340, 120, 56, small, value);
+    drawChip(memDc, L"ers", ersModeText(s.ersMode), 408, 120, 78, small, value);
+    drawChip(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 498, 120, 88, small, value);
 
-    drawBar(memDc, L"thr", s.throttle, 12, 156, 164, rgb(35, 243, 106), tiny);
-    drawBar(memDc, L"brk", s.brake, 194, 156, 164, rgb(255, 74, 74), tiny);
-    drawSteer(memDc, s.steer, 376, 156, 164, tiny);
+    drawBar(memDc, L"thr", s.throttle, 18, 176, 178, rgb(35, 243, 106), tiny);
+    drawBar(memDc, L"brk", s.brake, 220, 176, 178, rgb(255, 74, 74), tiny);
+    drawSteer(memDc, s.steer, 422, 176, 178, tiny);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -709,7 +725,7 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 565, 180, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 210, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
