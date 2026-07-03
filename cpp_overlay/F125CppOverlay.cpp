@@ -713,13 +713,13 @@ void paintHud(HWND hwnd) {
     drawText(memDc, L"GEAR", 24, 21, 70, 11, tiny, muted, DT_CENTER);
     drawText(memDc, gearText(s.gear), 22, 32, 76, 58, big, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    fillRect(memDc, 116, 12, 302, 92, panel);
-    strokeRect(memDc, 116, 12, 302, 92, line);
+    fillRect(memDc, 116, 12, 282, 92, panel);
+    strokeRect(memDc, 116, 12, 282, 92, line);
     drawText(memDc, L"r_", 128, 20, 24, 16, small, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 154, 21, 112, 14, tiny, muted, DT_LEFT);
     if (s.packetFormat) {
         std::wstring udpFormat = L"udp " + std::to_wstring(s.packetFormat);
-        drawText(memDc, udpFormat, 330, 21, 76, 14, tiny, muted, DT_RIGHT);
+        drawText(memDc, udpFormat, 310, 21, 76, 14, tiny, muted, DT_RIGHT);
     }
 
     int revX = 128;
@@ -737,17 +737,17 @@ void paintHud(HWND hwnd) {
     swprintf_s(rpmBuf, L"%05u", s.rpm);
     drawText(memDc, rpmBuf, 252, 70, 104, 30, med, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-    fillRect(memDc, 428, 12, 180, 100, panel);
-    strokeRect(memDc, 428, 12, 180, 100, line);
-    drawText(memDc, regulationTitle(), 442, 20, 72, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, systemLabel, 442, 34, 92, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, wingText(s), 522, 37, 72, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    fillRect(memDc, 442, 63, 148, 1, line);
-    drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, ersColor, DT_LEFT);
-    drawText(memDc, ersStatusText(s, ersPct), 480, 70, 56, 11, tiny, ersColor, DT_LEFT);
-    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ersPct))) + L"%", 540, 70, 50, 11, tiny, ersColor, DT_RIGHT);
-    fillRect(memDc, 442, 87, 148, 9, rgb(35, 35, 35));
-    fillRect(memDc, 442, 87, static_cast<int>(148 * ers), 9, ersColor);
+    fillRect(memDc, 408, 12, 200, 100, panel);
+    strokeRect(memDc, 408, 12, 200, 100, line);
+    drawText(memDc, regulationTitle(), 422, 20, 72, 12, tiny, muted, DT_LEFT);
+    drawText(memDc, systemLabel, 422, 34, 126, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, wingText(s), 548, 37, 46, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(memDc, 422, 63, 172, 1, line);
+    drawText(memDc, L"ERS", 422, 70, 34, 11, tiny, ersColor, DT_LEFT);
+    drawText(memDc, ersStatusText(s, ersPct), 460, 70, 72, 11, tiny, ersColor, DT_LEFT);
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ersPct))) + L"%", 544, 70, 50, 11, tiny, ersColor, DT_RIGHT);
+    fillRect(memDc, 422, 87, 172, 9, rgb(35, 35, 35));
+    fillRect(memDc, 422, 87, static_cast<int>(172 * ers), 9, ersColor);
 
     fillRect(memDc, 12, 122, 596, 42, panel);
     strokeRect(memDc, 12, 122, 596, 42, line);
