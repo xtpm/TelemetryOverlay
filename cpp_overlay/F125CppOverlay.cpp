@@ -527,7 +527,7 @@ void paintHud(HWND hwnd) {
     HFONT small = makeFont(9, FW_BOLD);
     HFONT value = makeFont(12, FW_BOLD, L"Bahnschrift SemiCondensed");
     HFONT big = makeFont(46, FW_BOLD, L"Bahnschrift SemiCondensed");
-    HFONT med = makeFont(29, FW_BOLD, L"Bahnschrift SemiCondensed");
+    HFONT med = makeFont(25, FW_BOLD, L"Bahnschrift SemiCondensed");
 
     float ers = clampf(s.ersEnergy / static_cast<float>(ERS_MAX_JOULES), 0, 1);
     COLORREF accent = g_regulationMode == RegulationMode::Reg2025 ? rgb(245, 213, 71) : rgb(35, 243, 106);
@@ -558,12 +558,12 @@ void paintHud(HWND hwnd) {
         fillRect(memDc, revX + i * 13, 42, 10, 8, c);
     }
 
-    drawText(memDc, L"KM/H", 128, 61, 48, 10, small, muted, DT_LEFT);
-    drawText(memDc, std::to_wstring(s.speed), 128, 72, 92, 26, med, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"RPM", 252, 61, 48, 10, small, muted, DT_LEFT);
+    drawText(memDc, L"KM/H", 128, 58, 48, 12, small, muted, DT_LEFT);
+    drawText(memDc, std::to_wstring(s.speed), 128, 70, 92, 30, med, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"RPM", 252, 58, 48, 12, small, muted, DT_LEFT);
     wchar_t rpmBuf[16];
     swprintf_s(rpmBuf, L"%05u", s.rpm);
-    drawText(memDc, rpmBuf, 252, 72, 104, 26, med, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, rpmBuf, 252, 70, 104, 30, med, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
     fillRect(memDc, 428, 12, 180, 100, panel);
     strokeRect(memDc, 428, 12, 180, 100, line);
