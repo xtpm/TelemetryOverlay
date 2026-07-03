@@ -567,13 +567,15 @@ void paintHud(HWND hwnd) {
 
     fillRect(memDc, 428, 12, 180, 100, panel);
     strokeRect(memDc, 428, 12, 180, 100, line);
-    drawText(memDc, regulationTitle(), 442, 21, 72, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 37, 72, 28, med, accent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, wingText(s), 522, 40, 72, 22, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    fillRect(memDc, 442, 78, 148, 8, rgb(35, 35, 35));
-    fillRect(memDc, 442, 78, static_cast<int>(148 * ers), 8, accent);
-    drawText(memDc, ersModeText(s.ersMode), 442, 91, 70, 12, tiny, muted, DT_LEFT);
-    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 520, 91, 70, 12, tiny, rgb(245, 245, 243), DT_RIGHT);
+    drawText(memDc, regulationTitle(), 442, 20, 72, 12, tiny, muted, DT_LEFT);
+    drawText(memDc, g_regulationMode == RegulationMode::Reg2025 ? L"DRS" : L"AERO", 442, 34, 72, 26, med, accent, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, wingText(s), 522, 37, 72, 20, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(memDc, 442, 63, 148, 1, line);
+    drawText(memDc, L"ERS", 442, 70, 34, 11, tiny, muted, DT_LEFT);
+    drawText(memDc, ersModeText(s.ersMode), 480, 70, 56, 11, tiny, muted, DT_LEFT);
+    drawText(memDc, std::to_wstring(static_cast<int>(std::round(ers * 100))) + L"%", 540, 70, 50, 11, tiny, rgb(245, 245, 243), DT_RIGHT);
+    fillRect(memDc, 442, 87, 148, 9, rgb(35, 35, 35));
+    fillRect(memDc, 442, 87, static_cast<int>(148 * ers), 9, accent);
 
     fillRect(memDc, 12, 122, 596, 42, panel);
     strokeRect(memDc, 12, 122, 596, 42, line);
