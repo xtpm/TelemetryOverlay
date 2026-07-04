@@ -986,28 +986,28 @@ void paintTiming(HWND hwnd) {
     uint32_t best = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
     int delta = s.stableDeltaMs;
 
-    drawText(memDc, L"current:", 16, 15, 80, 16, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, formatLap(s.currentLapMs), 150, 15, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
-    drawText(memDc, L"best:", 250, 15, 70, 16, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, formatLap(best), 330, 15, 84, 16, value, rgb(245, 245, 243), DT_RIGHT);
+    drawText(memDc, L"current:", 16, 14, 80, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatLap(s.currentLapMs), 150, 11, 90, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"best:", 250, 14, 70, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatLap(best), 330, 11, 84, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    drawText(memDc, L"last:", 16, 40, 80, 16, small, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, formatLap(s.lastLapMs), 150, 40, 90, 16, value, rgb(245, 245, 243), DT_RIGHT);
-    drawText(memDc, L"delta:", 250, 40, 70, 16, small, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"last:", 16, 40, 80, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatLap(s.lastLapMs), 150, 37, 90, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"delta:", 250, 40, 70, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     COLORREF deltaColor = delta == DELTA_UNKNOWN ? rgb(245, 245, 243) : (delta <= 0 ? rgb(35, 243, 106) : rgb(255, 74, 74));
-    drawText(memDc, formatDelta(delta), 330, 40, 84, 16, value, deltaColor, DT_RIGHT);
+    drawText(memDc, formatDelta(delta), 330, 37, 84, 24, value, deltaColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    strokeRect(memDc, 16, 72, rc.right - 32, 36, rgb(64, 64, 64));
+    strokeRect(memDc, 16, 76, rc.right - 32, 44, rgb(64, 64, 64));
     int col = (rc.right - 32) / 3;
-    fillRect(memDc, 16 + col, 72, 1, 36, rgb(64, 64, 64));
-    fillRect(memDc, 16 + col * 2, 72, 1, 36, rgb(64, 64, 64));
+    fillRect(memDc, 16 + col, 76, 1, 44, rgb(64, 64, 64));
+    fillRect(memDc, 16 + col * 2, 76, 1, 44, rgb(64, 64, 64));
     uint32_t s3 = s.lastLapMs && s.sector1Ms && s.sector2Ms ? s.lastLapMs - s.sector1Ms - s.sector2Ms : 0;
-    drawText(memDc, L"s1", 16, 76, col, 12, small, rgb(167, 167, 162), DT_CENTER);
-    drawText(memDc, formatShortMs(s.sector1Ms), 16, 91, col, 14, sectorFont, rgb(245, 245, 243), DT_CENTER);
-    drawText(memDc, L"s2", 16 + col, 76, col, 12, small, rgb(167, 167, 162), DT_CENTER);
-    drawText(memDc, formatShortMs(s.sector2Ms), 16 + col, 91, col, 14, sectorFont, rgb(245, 245, 243), DT_CENTER);
-    drawText(memDc, L"s3", 16 + col * 2, 76, col, 12, small, rgb(167, 167, 162), DT_CENTER);
-    drawText(memDc, formatShortMs(s3), 16 + col * 2, 91, col, 14, sectorFont, rgb(245, 245, 243), DT_CENTER);
+    drawText(memDc, L"s1", 16, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatShortMs(s.sector1Ms), 16, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"s2", 16 + col, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatShortMs(s.sector2Ms), 16 + col, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"s3", 16 + col * 2, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, formatShortMs(s3), 16 + col * 2, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -1090,7 +1090,7 @@ void launchRegulation(RegulationMode mode) {
         g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
     }
     if (!g_timing) {
-        g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
+        g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 144, timingProc);
     }
     if (!g_info) {
         g_info = createOverlayWindow(L"F125CppInfo", L"Info", 720, 80, 260, 320, infoProc);
