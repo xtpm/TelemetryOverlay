@@ -1071,8 +1071,8 @@ int g_hoverAction = 0;
 LauncherAction g_actions[] = {
     {ID_REG_2025, {238, 88, 596, 178}, L"2025 Regulations", L"DRS / ERS / tyres / timing"},
     {ID_REG_2026, {238, 202, 596, 292}, L"2026 Regulations", L"active aero / ERS / tyres / timing"},
-    {ID_SET_HOTKEY, {238, 346, 392, 386}, L"set keybind", L""},
-    {ID_EXIT, {466, 346, 596, 386}, L"exit", L""}
+    {ID_SET_HOTKEY, {238, 346, 438, 386}, L"overlay close keybind", L""},
+    {ID_EXIT, {492, 346, 596, 386}, L"exit", L""}
 };
 
 void launchRegulation(RegulationMode mode) {
