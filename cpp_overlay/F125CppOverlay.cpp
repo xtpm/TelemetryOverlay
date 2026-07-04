@@ -987,9 +987,9 @@ struct LauncherAction {
 int g_hoverAction = 0;
 
 LauncherAction g_actions[] = {
-    {ID_REG_2025, {238, 82, 596, 174}, L"2025 Regulations", L"DRS, ERS, tyres, timing"},
-    {ID_REG_2026, {238, 196, 596, 288}, L"2026 Regulations", L"active aero, ERS, tyres, timing"},
-    {ID_EXIT, {466, 332, 596, 372}, L"exit", L"close launcher"}
+    {ID_REG_2025, {238, 88, 596, 178}, L"2025 Regulations", L"DRS / ERS / tyres / timing"},
+    {ID_REG_2026, {238, 202, 596, 292}, L"2026 Regulations", L"active aero / ERS / tyres / timing"},
+    {ID_EXIT, {466, 346, 596, 386}, L"exit", L""}
 };
 
 void launchRegulation(RegulationMode mode) {
@@ -1013,13 +1013,15 @@ void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT ti
     if (hover) {
         fillRect(dc, action.rect.left, action.rect.top, 5, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
     }
-    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 18, 240, 22, titleFont, rgb(245, 245, 243), DT_LEFT);
-    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 49, 230, 16, bodyFont, rgb(167, 167, 162), DT_LEFT);
-    if (action.id != ID_EXIT) {
-        fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
-        strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
-        drawText(dc, L"launch", action.rect.right - 94, action.rect.top + 35, 52, 14, bodyFont, hover ? rgb(4, 5, 6) : rgb(245, 245, 243), DT_CENTER);
+    if (action.id == ID_EXIT) {
+        drawText(dc, action.title, action.rect.left, action.rect.top + 11, action.rect.right - action.rect.left, 18, titleFont, rgb(245, 245, 243), DT_CENTER);
+        return;
     }
+    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 17, 240, 24, titleFont, rgb(245, 245, 243), DT_LEFT);
+    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 50, 260, 18, bodyFont, rgb(167, 167, 162), DT_LEFT);
+    fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
+    strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
+    drawText(dc, L"launch", action.rect.right - 94, action.rect.top + 34, 52, 18, bodyFont, hover ? rgb(4, 5, 6) : rgb(245, 245, 243), DT_CENTER);
 }
 
 void paintLauncher(HWND hwnd) {
@@ -1038,8 +1040,8 @@ void paintLauncher(HWND hwnd) {
     fillRect(memDc, 22, 22, 186, rc.bottom - 44, rgb(8, 9, 11));
     fillRect(memDc, 22, 22, 5, rc.bottom - 44, rgb(35, 243, 106));
     fillRect(memDc, 220, 22, 1, rc.bottom - 44, rgb(42, 42, 40));
-    fillRect(memDc, 238, 52, 358, 1, rgb(42, 42, 40));
-    fillRect(memDc, 238, 318, 358, 1, rgb(42, 42, 40));
+    fillRect(memDc, 238, 58, 358, 1, rgb(42, 42, 40));
+    fillRect(memDc, 238, 330, 358, 1, rgb(42, 42, 40));
 
     HFONT title = makeFont(30, FW_BOLD, L"Exo 2");
     HFONT logo = makeFont(24, FW_BOLD);
@@ -1048,10 +1050,10 @@ void paintLauncher(HWND hwnd) {
     HFONT micro = makeFont(8, FW_BOLD);
 
     drawText(memDc, L"r_", 42, 42, 48, 28, logo, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"f1", 42, 94, 52, 36, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"telemetry", 42, 126, 150, 34, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"native c++ overlay", 42, 169, 144, 16, label, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, L"retrial.cc inspired", 42, 190, 144, 14, body, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, L"f1", 42, 92, 52, 40, title, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"telemetry", 42, 126, 154, 40, title, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"native c++ overlay", 42, 174, 144, 18, label, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"retrial.cc inspired", 42, 196, 144, 16, body, rgb(110, 110, 104), DT_LEFT);
 
     TelemetryState s;
     {
@@ -1060,14 +1062,14 @@ void paintLauncher(HWND hwnd) {
     }
     drawText(memDc, s.connected ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, s.connected ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
     drawText(memDc, L"127.0.0.1:20777", 42, 286, 144, 14, body, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, L"Choose Regulations", 238, 24, 210, 22, label, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"select the car generation to launch every overlay window", 238, 340, 214, 14, micro, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, L"Choose Regulations", 238, 30, 210, 24, label, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"launches HUD, timing strip, and info panel", 238, 356, 210, 16, micro, rgb(110, 110, 104), DT_LEFT);
 
     for (const auto& action : g_actions) {
         drawLauncherCard(memDc, action, g_hoverAction == action.id, label, body);
     }
 
-    drawText(memDc, L"set UDP telemetry to 2025 format in-game", 42, 334, 144, 28, micro, rgb(110, 110, 104), DT_LEFT | DT_WORDBREAK);
+    drawText(memDc, L"match the in-game UDP format", 42, 342, 144, 28, micro, rgb(110, 110, 104), DT_LEFT | DT_WORDBREAK);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -1162,7 +1164,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 C++ Overlay Launcher",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        160, 160, 635, 430, nullptr, nullptr, hInstance, nullptr);
+        160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
 
     MSG msg{};
