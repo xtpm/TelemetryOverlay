@@ -737,6 +737,11 @@ bool isModifierKey(UINT vk) {
         vk == VK_LWIN || vk == VK_RWIN;
 }
 
+bool udpLive() {
+    std::lock_guard<std::mutex> lock(g_stateMutex);
+    return g_state.connected && GetTickCount64() - g_state.lastSeenTick <= 2000;
+}
+
 LRESULT CALLBACK overlayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_ERASEBKGND) {
         return 1;
@@ -1089,11 +1094,13 @@ void launchRegulation(RegulationMode mode) {
 }
 
 void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT titleFont, HFONT bodyFont) {
-    COLORREF fill = hover ? rgb(18, 20, 23) : rgb(8, 9, 11);
-    COLORREF border = hover ? rgb(35, 243, 106) : rgb(58, 58, 56);
+    bool regulationCard = action.id == ID_REG_2025 || action.id == ID_REG_2026;
+    bool disabled = regulationCard && !udpLive();
+    COLORREF fill = hover && !disabled ? rgb(18, 20, 23) : rgb(8, 9, 11);
+    COLORREF border = hover && !disabled ? rgb(35, 243, 106) : rgb(58, 58, 56);
     fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, fill);
     strokeRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, border);
-    if (hover) {
+    if (hover && !disabled) {
         fillRect(dc, action.rect.left, action.rect.top, 5, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
     }
     if (action.id == ID_EXIT || action.id == ID_SET_HOTKEY) {
@@ -1102,11 +1109,14 @@ void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT ti
             action.id == ID_SET_HOTKEY && g_capturingHotkey ? rgb(245, 213, 71) : rgb(245, 245, 243), DT_CENTER);
         return;
     }
-    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 17, 240, 24, titleFont, rgb(245, 245, 243), DT_LEFT);
-    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 50, 260, 18, bodyFont, rgb(167, 167, 162), DT_LEFT);
-    fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
-    strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
-    drawText(dc, L"launch", action.rect.right - 94, action.rect.top + 34, 52, 18, bodyFont, hover ? rgb(4, 5, 6) : rgb(245, 245, 243), DT_CENTER);
+    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 17, 240, 24, titleFont, disabled ? rgb(110, 110, 104) : rgb(245, 245, 243), DT_LEFT);
+    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 50, 260, 18, bodyFont, disabled ? rgb(90, 90, 86) : rgb(167, 167, 162), DT_LEFT);
+    COLORREF buttonFill = disabled ? rgb(12, 13, 15) : (hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
+    COLORREF buttonLine = disabled ? rgb(45, 45, 43) : (hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
+    fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, buttonFill);
+    strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, buttonLine);
+    drawText(dc, disabled ? L"waiting" : L"launch", action.rect.right - 94, action.rect.top + 34, 52, 18, bodyFont,
+        disabled ? rgb(245, 213, 71) : (hover ? rgb(4, 5, 6) : rgb(245, 245, 243)), DT_CENTER);
 }
 
 void paintLauncher(HWND hwnd) {
@@ -1144,7 +1154,8 @@ void paintLauncher(HWND hwnd) {
         std::lock_guard<std::mutex> lock(g_stateMutex);
         s = g_state;
     }
-    drawText(memDc, s.connected ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, s.connected ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
+    bool liveUdp = s.connected && GetTickCount64() - s.lastSeenTick <= 2000;
+    drawText(memDc, liveUdp ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, liveUdp ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
     drawText(memDc, L"127.0.0.1:20777", 42, 286, 144, 14, body, rgb(167, 167, 162), DT_LEFT);
     drawText(memDc, L"Choose Regulations", 238, 30, 210, 24, label, rgb(245, 245, 243), DT_LEFT);
     std::wstring hotkeyLine = g_capturingHotkey ? L"press close keybind now" : L"close: " + hotkeyText();
@@ -1260,9 +1271,19 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     SetFocus(hwnd);
                     InvalidateRect(hwnd, nullptr, FALSE);
                 } else if (action.id == ID_REG_2025) {
+                    if (!udpLive()) {
+                        g_hotkeyHint = L"waiting for UDP";
+                        InvalidateRect(hwnd, nullptr, FALSE);
+                        return 0;
+                    }
                     launchRegulation(RegulationMode::Reg2025);
                     ShowWindow(hwnd, SW_HIDE);
                 } else {
+                    if (!udpLive()) {
+                        g_hotkeyHint = L"waiting for UDP";
+                        InvalidateRect(hwnd, nullptr, FALSE);
+                        return 0;
+                    }
                     launchRegulation(RegulationMode::Reg2026);
                     ShowWindow(hwnd, SW_HIDE);
                 }

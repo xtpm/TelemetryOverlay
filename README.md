@@ -33,6 +33,8 @@ The launcher lets you choose:
 - `2025 Regulations`
 - `2026 Regulations`
 
+The overlay buttons unlock after UDP telemetry is detected.
+
 Close the overlay with `Ctrl + Shift + Q` by default, or change it from `overlay close keybind` in the launcher.
 
 ## F1 25 Telemetry Settings
