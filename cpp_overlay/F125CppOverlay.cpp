@@ -646,7 +646,9 @@ void udpThread() {
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(20777);
-    inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    BOOL reuse = TRUE;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
     bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
 
     DWORD timeout = 250;
@@ -654,7 +656,14 @@ void udpThread() {
     uint8_t buffer[2048];
     while (g_running) {
         int received = recv(sock, reinterpret_cast<char*>(buffer), sizeof(buffer), 0);
-        if (received > 0) parsePacket(buffer, static_cast<size_t>(received));
+        if (received > 0) {
+            {
+                std::lock_guard<std::mutex> lock(g_stateMutex);
+                g_state.connected = true;
+                g_state.lastSeenTick = GetTickCount64();
+            }
+            parsePacket(buffer, static_cast<size_t>(received));
+        }
     }
 
     closesocket(sock);
