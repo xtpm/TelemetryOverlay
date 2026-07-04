@@ -108,7 +108,7 @@ HWND g_timing = nullptr;
 HWND g_info = nullptr;
 HINSTANCE g_instance = nullptr;
 HANDLE g_exoFont = nullptr;
-const RECT HUD_EXIT_RECT{620, 18, 638, 36};
+constexpr int HOTKEY_EXIT_ID = 1;
 
 enum class RegulationMode {
     Reg2025,
@@ -726,11 +726,6 @@ void paintHud(HWND hwnd) {
     float ersPct = ers * 100.0f;
     COLORREF ersColor = s.ersFault || ersPct <= 10.0f ? rgb(255, 74, 74) : accent;
 
-    fillRect(memDc, 616, 12, 24, 194, panel);
-    strokeRect(memDc, 616, 12, 24, 194, line);
-    strokeRect(memDc, HUD_EXIT_RECT.left, HUD_EXIT_RECT.top, HUD_EXIT_RECT.right - HUD_EXIT_RECT.left, HUD_EXIT_RECT.bottom - HUD_EXIT_RECT.top, rgb(255, 74, 74));
-    drawText(memDc, L"x", HUD_EXIT_RECT.left, HUD_EXIT_RECT.top, HUD_EXIT_RECT.right - HUD_EXIT_RECT.left, HUD_EXIT_RECT.bottom - HUD_EXIT_RECT.top, small, rgb(255, 74, 74), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
     fillRect(memDc, 12, 12, 94, 92, panel);
     strokeRect(memDc, 12, 12, 94, 92, line);
     fillRect(memDc, 12, 12, 4, 92, accent);
@@ -946,13 +941,6 @@ LRESULT CALLBACK hudProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         paintHud(hwnd);
         return 0;
     }
-    if (msg == WM_LBUTTONDOWN) {
-        POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
-        if (PtInRect(&HUD_EXIT_RECT, pt)) {
-            requestExit();
-            return 0;
-        }
-    }
     return overlayProc(hwnd, msg, wp, lp);
 }
 
@@ -1013,7 +1001,7 @@ LauncherAction g_actions[] = {
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
     if (!g_hud) {
-        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 652, 220, hudProc);
+        g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
     }
     if (!g_timing) {
         g_timing = createOverlayWindow(L"F125CppTiming", L"Timing", 82, 38, 430, 128, timingProc);
@@ -1195,14 +1183,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
         WS_POPUP,
         160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
+    RegisterHotKey(nullptr, HOTKEY_EXIT_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'Q');
 
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
+        if (msg.message == WM_HOTKEY && msg.wParam == HOTKEY_EXIT_ID) {
+            requestExit();
+            continue;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
     g_running = false;
+    UnregisterHotKey(nullptr, HOTKEY_EXIT_ID);
     if (network.joinable()) network.join();
     if (g_exoFont) RemoveFontMemResourceEx(g_exoFont);
     return 0;

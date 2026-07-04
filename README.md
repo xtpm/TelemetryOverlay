@@ -33,6 +33,8 @@ The launcher lets you choose:
 - `2025 Regulations`
 - `2026 Regulations`
 
+Close the overlay with `Ctrl + Shift + Q`.
+
 ## F1 25 Telemetry Settings
 
 In F1 25, open telemetry settings and use:
