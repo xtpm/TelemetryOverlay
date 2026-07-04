@@ -1,4 +1,4 @@
-# F1 25 C++ Telemetry Overlay
+# F1 25 Telemetry Overlay
 
 Native Win32 overlay for F1 25 UDP telemetry.
 

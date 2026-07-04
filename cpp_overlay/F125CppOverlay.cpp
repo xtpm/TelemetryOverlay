@@ -1171,7 +1171,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     RegisterClassW(&wc);
 
-    HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 C++ Overlay Launcher",
+    HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 Overlay Launcher",
         WS_POPUP,
         160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);

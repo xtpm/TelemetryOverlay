@@ -1,12 +1,12 @@
 # F1 25 Telemetry Overlay
 
-Native C++ telemetry overlay for F1 25, built with the Win32 API.
+Native telemetry overlay for F1 25, built with the Win32 API.
 
 The app listens for F1 25 UDP telemetry on `127.0.0.1:20777` and provides a small launcher for opening overlay windows while driving.
 
 ## Features
 
-- Native Windows C++ app
+- Native Windows app
 - Lightweight launcher UI
 - Retrial-style HUD
 - Timing strip
@@ -30,9 +30,8 @@ Or run:
 
 The launcher lets you choose:
 
-- `launch everything`
-- `retrial HUD only`
-- `timing strip only`
+- `2025 Regulations`
+- `2026 Regulations`
 
 ## F1 25 Telemetry Settings
 
