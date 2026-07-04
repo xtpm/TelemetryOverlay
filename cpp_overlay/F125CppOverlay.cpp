@@ -1052,8 +1052,7 @@ void paintLauncher(HWND hwnd) {
     drawText(memDc, L"r_", 42, 42, 48, 28, logo, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, L"f1", 42, 92, 52, 40, title, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, L"telemetry", 42, 126, 154, 40, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"native c++ overlay", 42, 174, 144, 18, label, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, L"retrial.cc inspired", 42, 196, 144, 16, body, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, L"made by retrial", 42, 176, 144, 18, label, rgb(167, 167, 162), DT_LEFT);
 
     TelemetryState s;
     {
