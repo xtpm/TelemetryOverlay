@@ -987,9 +987,9 @@ struct LauncherAction {
 int g_hoverAction = 0;
 
 LauncherAction g_actions[] = {
-    {ID_REG_2025, {24, 126, 456, 188}, L"2025 Regulations", L"DRS era overlay for 2025 cars"},
-    {ID_REG_2026, {24, 204, 456, 266}, L"2026 Regulations", L"active aero overlay for 2026 cars"},
-    {ID_EXIT, {336, 316, 456, 352}, L"exit", L"close launcher"}
+    {ID_REG_2025, {238, 82, 596, 174}, L"2025 Regulations", L"DRS, ERS, tyres, timing"},
+    {ID_REG_2026, {238, 196, 596, 288}, L"2026 Regulations", L"active aero, ERS, tyres, timing"},
+    {ID_EXIT, {466, 332, 596, 372}, L"exit", L"close launcher"}
 };
 
 void launchRegulation(RegulationMode mode) {
@@ -1006,17 +1006,19 @@ void launchRegulation(RegulationMode mode) {
 }
 
 void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT titleFont, HFONT bodyFont) {
-    COLORREF fill = hover ? rgb(22, 24, 27) : rgb(11, 12, 14);
-    COLORREF border = hover ? rgb(245, 245, 243) : rgb(64, 64, 64);
+    COLORREF fill = hover ? rgb(18, 20, 23) : rgb(8, 9, 11);
+    COLORREF border = hover ? rgb(35, 243, 106) : rgb(58, 58, 56);
     fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, fill);
     strokeRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, border);
     if (hover) {
-        fillRect(dc, action.rect.left, action.rect.top, 4, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
+        fillRect(dc, action.rect.left, action.rect.top, 5, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
     }
-    drawText(dc, action.title, action.rect.left + 16, action.rect.top + 9, 260, 16, titleFont, rgb(245, 245, 243), DT_LEFT);
-    drawText(dc, action.subtitle, action.rect.left + 16, action.rect.top + 29, 290, 14, bodyFont, rgb(167, 167, 162), DT_LEFT);
+    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 18, 240, 22, titleFont, rgb(245, 245, 243), DT_LEFT);
+    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 49, 230, 16, bodyFont, rgb(167, 167, 162), DT_LEFT);
     if (action.id != ID_EXIT) {
-        drawText(dc, L"select", action.rect.right - 76, action.rect.top + 22, 54, 16, bodyFont, hover ? rgb(35, 243, 106) : rgb(167, 167, 162), DT_RIGHT);
+        fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
+        strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
+        drawText(dc, L"launch", action.rect.right - 94, action.rect.top + 35, 52, 14, bodyFont, hover ? rgb(4, 5, 6) : rgb(245, 245, 243), DT_CENTER);
     }
 }
 
@@ -1030,33 +1032,42 @@ void paintLauncher(HWND hwnd) {
     HBITMAP memBitmap = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
     HGDIOBJ oldBitmap = SelectObject(memDc, memBitmap);
 
-    fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(4, 5, 6));
+    fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(3, 4, 5));
     strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(116, 116, 110));
-    strokeRect(memDc, 8, 8, rc.right - 16, rc.bottom - 16, rgb(34, 34, 34));
-    fillRect(memDc, 24, 24, 4, 64, rgb(35, 243, 106));
+    strokeRect(memDc, 10, 10, rc.right - 20, rc.bottom - 20, rgb(42, 42, 40));
+    fillRect(memDc, 22, 22, 186, rc.bottom - 44, rgb(8, 9, 11));
+    fillRect(memDc, 22, 22, 5, rc.bottom - 44, rgb(35, 243, 106));
+    fillRect(memDc, 220, 22, 1, rc.bottom - 44, rgb(42, 42, 40));
+    fillRect(memDc, 238, 52, 358, 1, rgb(42, 42, 40));
+    fillRect(memDc, 238, 318, 358, 1, rgb(42, 42, 40));
 
-    HFONT title = makeFont(28, FW_BOLD, L"Exo 2");
-    HFONT logo = makeFont(18, FW_BOLD);
-    HFONT label = makeFont(11, FW_BOLD);
+    HFONT title = makeFont(30, FW_BOLD, L"Exo 2");
+    HFONT logo = makeFont(24, FW_BOLD);
+    HFONT label = makeFont(12, FW_BOLD);
     HFONT body = makeFont(10, FW_BOLD);
+    HFONT micro = makeFont(8, FW_BOLD);
 
-    drawText(memDc, L"r_", 40, 24, 34, 20, logo, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"f1 telemetry", 40, 48, 220, 34, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"choose regulation format", 40, 82, 260, 16, label, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"r_", 42, 42, 48, 28, logo, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"f1", 42, 94, 52, 36, title, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"telemetry", 42, 126, 150, 34, title, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"native c++ overlay", 42, 169, 144, 16, label, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"retrial.cc inspired", 42, 190, 144, 14, body, rgb(110, 110, 104), DT_LEFT);
 
     TelemetryState s;
     {
         std::lock_guard<std::mutex> lock(g_stateMutex);
         s = g_state;
     }
-    drawText(memDc, s.connected ? L"udp live" : L"waiting for udp", 330, 34, 126, 16, label, s.connected ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_RIGHT);
-    drawText(memDc, L"127.0.0.1:20777", 330, 55, 126, 16, body, rgb(167, 167, 162), DT_RIGHT);
+    drawText(memDc, s.connected ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, s.connected ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
+    drawText(memDc, L"127.0.0.1:20777", 42, 286, 144, 14, body, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"Choose Regulations", 238, 24, 210, 22, label, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"select the car generation to launch every overlay window", 238, 340, 214, 14, micro, rgb(110, 110, 104), DT_LEFT);
 
     for (const auto& action : g_actions) {
         drawLauncherCard(memDc, action, g_hoverAction == action.id, label, body);
     }
 
-    drawText(memDc, L"tip: set the same UDP format in F1 25 telemetry settings.", 24, 326, 310, 16, body, rgb(110, 110, 104), DT_LEFT);
+    drawText(memDc, L"set UDP telemetry to 2025 format in-game", 42, 334, 144, 28, micro, rgb(110, 110, 104), DT_LEFT | DT_WORDBREAK);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -1064,6 +1075,7 @@ void paintLauncher(HWND hwnd) {
     DeleteObject(logo);
     DeleteObject(label);
     DeleteObject(body);
+    DeleteObject(micro);
     SelectObject(memDc, oldBitmap);
     DeleteObject(memBitmap);
     DeleteDC(memDc);
@@ -1150,7 +1162,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 C++ Overlay Launcher",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        160, 160, 500, 410, nullptr, nullptr, hInstance, nullptr);
+        160, 160, 635, 430, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
 
     MSG msg{};
