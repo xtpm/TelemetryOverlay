@@ -1122,6 +1122,16 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     }
+    if (msg == WM_NCHITTEST) {
+        POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+        ScreenToClient(hwnd, &pt);
+        for (const auto& action : g_actions) {
+            if (PtInRect(&action.rect, pt)) {
+                return HTCLIENT;
+            }
+        }
+        return HTCAPTION;
+    }
     if (msg == WM_LBUTTONDOWN) {
         POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
         for (const auto& action : g_actions) {
@@ -1163,7 +1173,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     RegisterClassW(&wc);
 
     HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 C++ Overlay Launcher",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+        WS_POPUP,
         160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
 
