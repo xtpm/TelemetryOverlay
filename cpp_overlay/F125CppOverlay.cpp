@@ -1139,8 +1139,10 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     DestroyWindow(hwnd);
                 } else if (action.id == ID_REG_2025) {
                     launchRegulation(RegulationMode::Reg2025);
+                    ShowWindow(hwnd, SW_HIDE);
                 } else {
                     launchRegulation(RegulationMode::Reg2026);
+                    ShowWindow(hwnd, SW_HIDE);
                 }
                 return 0;
             }
