@@ -108,6 +108,7 @@ HWND g_timing = nullptr;
 HWND g_info = nullptr;
 HINSTANCE g_instance = nullptr;
 HANDLE g_exoFont = nullptr;
+const RECT HUD_EXIT_RECT{584, 16, 604, 36};
 
 enum class RegulationMode {
     Reg2025,
@@ -656,6 +657,11 @@ void udpThread() {
     WSACleanup();
 }
 
+void requestExit() {
+    g_running = false;
+    PostQuitMessage(0);
+}
+
 LRESULT CALLBACK overlayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_ERASEBKGND) {
         return 1;
@@ -670,7 +676,7 @@ LRESULT CALLBACK overlayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     if (msg == WM_KEYDOWN && wp == VK_ESCAPE) {
-        DestroyWindow(hwnd);
+        requestExit();
         return 0;
     }
     if (msg == WM_DESTROY) {
@@ -752,6 +758,8 @@ void paintHud(HWND hwnd) {
 
     fillRect(memDc, 408, 12, 200, 100, panel);
     strokeRect(memDc, 408, 12, 200, 100, line);
+    strokeRect(memDc, HUD_EXIT_RECT.left, HUD_EXIT_RECT.top, HUD_EXIT_RECT.right - HUD_EXIT_RECT.left, HUD_EXIT_RECT.bottom - HUD_EXIT_RECT.top, rgb(255, 74, 74));
+    drawText(memDc, L"x", HUD_EXIT_RECT.left, HUD_EXIT_RECT.top + 1, HUD_EXIT_RECT.right - HUD_EXIT_RECT.left, HUD_EXIT_RECT.bottom - HUD_EXIT_RECT.top, small, rgb(255, 74, 74), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, regulationTitle(), 422, 20, 72, 12, tiny, muted, DT_LEFT);
     drawText(memDc, systemLabel, 422, 34, 126, 26, med, systemColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, wingText(s), 548, 37, 46, 20, value, systemColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
@@ -934,6 +942,13 @@ LRESULT CALLBACK hudProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_PAINT) {
         paintHud(hwnd);
         return 0;
+    }
+    if (msg == WM_LBUTTONDOWN) {
+        POINT pt{GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+        if (PtInRect(&HUD_EXIT_RECT, pt)) {
+            requestExit();
+            return 0;
+        }
     }
     return overlayProc(hwnd, msg, wp, lp);
 }
