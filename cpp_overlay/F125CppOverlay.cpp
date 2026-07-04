@@ -26,6 +26,7 @@ constexpr int ERS_MAX_JOULES = 4000000;
 constexpr int TIMER_ID = 1;
 constexpr int FRAME_MS = 16;
 constexpr int DELTA_UNKNOWN = INT32_MIN;
+constexpr int HOTKEY_EXIT_ID = 1;
 
 struct TelemetryState {
     bool connected = false;
@@ -108,7 +109,10 @@ HWND g_timing = nullptr;
 HWND g_info = nullptr;
 HINSTANCE g_instance = nullptr;
 HANDLE g_exoFont = nullptr;
-constexpr int HOTKEY_EXIT_ID = 1;
+UINT g_hotkeyModifiers = MOD_CONTROL | MOD_SHIFT;
+UINT g_hotkeyVk = 'Q';
+bool g_capturingHotkey = false;
+std::wstring g_hotkeyHint = L"";
 
 enum class RegulationMode {
     Reg2025,
@@ -662,6 +666,77 @@ void requestExit() {
     PostQuitMessage(0);
 }
 
+std::wstring configPath() {
+    wchar_t path[MAX_PATH]{};
+    GetModuleFileNameW(nullptr, path, MAX_PATH);
+    std::wstring result = path;
+    size_t slash = result.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) result.resize(slash + 1);
+    result += L"F125TelemetryOverlay.ini";
+    return result;
+}
+
+std::wstring keyName(UINT vk) {
+    if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9')) {
+        return std::wstring(1, static_cast<wchar_t>(vk));
+    }
+    UINT scan = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC);
+    if (vk == VK_LEFT || vk == VK_UP || vk == VK_RIGHT || vk == VK_DOWN ||
+        vk == VK_PRIOR || vk == VK_NEXT || vk == VK_END || vk == VK_HOME ||
+        vk == VK_INSERT || vk == VK_DELETE) {
+        scan |= 0x100;
+    }
+    wchar_t name[64]{};
+    if (GetKeyNameTextW(static_cast<LONG>(scan << 16), name, 64) > 0) {
+        return name;
+    }
+    wchar_t fallback[16]{};
+    swprintf_s(fallback, L"VK%u", vk);
+    return fallback;
+}
+
+std::wstring hotkeyText() {
+    std::wstring text;
+    if (g_hotkeyModifiers & MOD_CONTROL) text += L"Ctrl + ";
+    if (g_hotkeyModifiers & MOD_SHIFT) text += L"Shift + ";
+    if (g_hotkeyModifiers & MOD_ALT) text += L"Alt + ";
+    if (g_hotkeyModifiers & MOD_WIN) text += L"Win + ";
+    text += keyName(g_hotkeyVk);
+    return text;
+}
+
+bool registerCloseHotkey() {
+    UnregisterHotKey(nullptr, HOTKEY_EXIT_ID);
+    return RegisterHotKey(nullptr, HOTKEY_EXIT_ID, g_hotkeyModifiers | MOD_NOREPEAT, g_hotkeyVk) != 0;
+}
+
+void saveHotkey() {
+    std::wstring path = configPath();
+    wchar_t mods[16]{};
+    wchar_t key[16]{};
+    swprintf_s(mods, L"%u", g_hotkeyModifiers);
+    swprintf_s(key, L"%u", g_hotkeyVk);
+    WritePrivateProfileStringW(L"close_hotkey", L"modifiers", mods, path.c_str());
+    WritePrivateProfileStringW(L"close_hotkey", L"key", key, path.c_str());
+}
+
+void loadHotkey() {
+    std::wstring path = configPath();
+    g_hotkeyModifiers = GetPrivateProfileIntW(L"close_hotkey", L"modifiers", MOD_CONTROL | MOD_SHIFT, path.c_str());
+    g_hotkeyVk = GetPrivateProfileIntW(L"close_hotkey", L"key", 'Q', path.c_str());
+    if (!g_hotkeyModifiers || !g_hotkeyVk) {
+        g_hotkeyModifiers = MOD_CONTROL | MOD_SHIFT;
+        g_hotkeyVk = 'Q';
+    }
+}
+
+bool isModifierKey(UINT vk) {
+    return vk == VK_CONTROL || vk == VK_LCONTROL || vk == VK_RCONTROL ||
+        vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT ||
+        vk == VK_MENU || vk == VK_LMENU || vk == VK_RMENU ||
+        vk == VK_LWIN || vk == VK_RWIN;
+}
+
 LRESULT CALLBACK overlayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_ERASEBKGND) {
         return 1;
@@ -980,6 +1055,7 @@ HWND createOverlayWindow(const wchar_t* cls, const wchar_t* title, int x, int y,
 enum MenuCommand {
     ID_REG_2025 = 1001,
     ID_REG_2026 = 1002,
+    ID_SET_HOTKEY = 1003,
     ID_EXIT = 1004
 };
 
@@ -995,6 +1071,7 @@ int g_hoverAction = 0;
 LauncherAction g_actions[] = {
     {ID_REG_2025, {238, 88, 596, 178}, L"2025 Regulations", L"DRS / ERS / tyres / timing"},
     {ID_REG_2026, {238, 202, 596, 292}, L"2026 Regulations", L"active aero / ERS / tyres / timing"},
+    {ID_SET_HOTKEY, {238, 346, 392, 386}, L"set keybind", L""},
     {ID_EXIT, {466, 346, 596, 386}, L"exit", L""}
 };
 
@@ -1019,8 +1096,10 @@ void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT ti
     if (hover) {
         fillRect(dc, action.rect.left, action.rect.top, 5, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
     }
-    if (action.id == ID_EXIT) {
-        drawText(dc, action.title, action.rect.left, action.rect.top + 11, action.rect.right - action.rect.left, 18, titleFont, rgb(245, 245, 243), DT_CENTER);
+    if (action.id == ID_EXIT || action.id == ID_SET_HOTKEY) {
+        const wchar_t* label = action.id == ID_SET_HOTKEY && g_capturingHotkey ? L"press keys" : action.title;
+        drawText(dc, label, action.rect.left, action.rect.top + 11, action.rect.right - action.rect.left, 18, titleFont,
+            action.id == ID_SET_HOTKEY && g_capturingHotkey ? rgb(245, 213, 71) : rgb(245, 245, 243), DT_CENTER);
         return;
     }
     drawText(dc, action.title, action.rect.left + 18, action.rect.top + 17, 240, 24, titleFont, rgb(245, 245, 243), DT_LEFT);
@@ -1068,7 +1147,13 @@ void paintLauncher(HWND hwnd) {
     drawText(memDc, s.connected ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, s.connected ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
     drawText(memDc, L"127.0.0.1:20777", 42, 286, 144, 14, body, rgb(167, 167, 162), DT_LEFT);
     drawText(memDc, L"Choose Regulations", 238, 30, 210, 24, label, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"launches HUD, timing strip, and info panel", 238, 356, 210, 16, micro, rgb(110, 110, 104), DT_LEFT);
+    std::wstring hotkeyLine = g_capturingHotkey ? L"press close keybind now" : L"close: " + hotkeyText();
+    COLORREF hotkeyColor = g_capturingHotkey ? rgb(245, 213, 71) : rgb(110, 110, 104);
+    drawText(memDc, hotkeyLine, 238, 314, 260, 16, micro, hotkeyColor, DT_LEFT);
+    if (!g_hotkeyHint.empty()) {
+        COLORREF hintColor = g_hotkeyHint == L"saved" ? rgb(35, 243, 106) : rgb(255, 74, 74);
+        drawText(memDc, g_hotkeyHint, 238, 330, 260, 14, micro, hintColor, DT_LEFT);
+    }
 
     for (const auto& action : g_actions) {
         drawLauncherCard(memDc, action, g_hoverAction == action.id, label, body);
@@ -1102,6 +1187,32 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     }
     if (msg == WM_TIMER) {
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+    }
+    if (msg == WM_KEYDOWN && g_capturingHotkey) {
+        UINT vk = static_cast<UINT>(wp);
+        if (vk == VK_ESCAPE) {
+            g_capturingHotkey = false;
+            g_hotkeyHint = L"";
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        UINT mods = 0;
+        if (GetKeyState(VK_CONTROL) & 0x8000) mods |= MOD_CONTROL;
+        if (GetKeyState(VK_SHIFT) & 0x8000) mods |= MOD_SHIFT;
+        if (GetKeyState(VK_MENU) & 0x8000) mods |= MOD_ALT;
+        if ((GetKeyState(VK_LWIN) & 0x8000) || (GetKeyState(VK_RWIN) & 0x8000)) mods |= MOD_WIN;
+        if (!mods || isModifierKey(vk)) {
+            g_hotkeyHint = L"use ctrl / shift / alt + key";
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        g_hotkeyModifiers = mods;
+        g_hotkeyVk = vk;
+        saveHotkey();
+        g_hotkeyHint = registerCloseHotkey() ? L"saved" : L"could not register";
+        g_capturingHotkey = false;
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     }
@@ -1143,6 +1254,11 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (PtInRect(&action.rect, pt)) {
                 if (action.id == ID_EXIT) {
                     DestroyWindow(hwnd);
+                } else if (action.id == ID_SET_HOTKEY) {
+                    g_capturingHotkey = true;
+                    g_hotkeyHint = L"";
+                    SetFocus(hwnd);
+                    InvalidateRect(hwnd, nullptr, FALSE);
                 } else if (action.id == ID_REG_2025) {
                     launchRegulation(RegulationMode::Reg2025);
                     ShowWindow(hwnd, SW_HIDE);
@@ -1168,6 +1284,7 @@ LRESULT CALLBACK menuProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     g_instance = hInstance;
     loadEmbeddedFont();
+    loadHotkey();
     std::thread network(udpThread);
 
     WNDCLASSW wc{};
@@ -1183,7 +1300,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
         WS_POPUP,
         160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
-    RegisterHotKey(nullptr, HOTKEY_EXIT_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'Q');
+    if (!registerCloseHotkey()) {
+        g_hotkeyHint = L"hotkey unavailable";
+    }
 
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
