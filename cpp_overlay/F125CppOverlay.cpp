@@ -113,6 +113,10 @@ UINT g_hotkeyModifiers = MOD_CONTROL | MOD_SHIFT;
 UINT g_hotkeyVk = 'Q';
 bool g_capturingHotkey = false;
 std::wstring g_hotkeyHint = L"";
+bool g_prepareCueArmed = true;
+bool g_activateCueArmed = true;
+uint64_t g_lastPrepareCueTick = 0;
+uint64_t g_lastActivateCueTick = 0;
 
 enum class RegulationMode {
     Reg2025,
@@ -264,6 +268,42 @@ std::wstring wingText(const TelemetryState& s) {
 
 bool regulationSystemActive(const TelemetryState& s) {
     return g_regulationMode == RegulationMode::Reg2025 ? s.drsActive != 0 : s.activeAeroMode != 0;
+}
+
+void playCue(UINT sound) {
+    MessageBeep(sound);
+}
+
+void updateSystemAudioCues(const TelemetryState& s) {
+    if (!s.connected || GetTickCount64() - s.lastSeenTick > 2000) return;
+
+    uint64_t now = GetTickCount64();
+    bool prepare = false;
+    bool activate = false;
+
+    if (g_regulationMode == RegulationMode::Reg2025) {
+        prepare = !s.drsAllowed && s.drsActivationDistance > 0 && s.drsActivationDistance <= 150;
+        activate = s.drsAllowed && !s.drsActive;
+    } else {
+        prepare = !s.activeAeroMode && !s.activeAeroAvailable && s.speed >= 220 && s.throttle > 0.85f && s.brake < 0.05f;
+        activate = s.activeAeroAvailable && !s.activeAeroMode;
+    }
+
+    if (prepare && g_prepareCueArmed && now - g_lastPrepareCueTick > 4000) {
+        playCue(MB_ICONASTERISK);
+        g_prepareCueArmed = false;
+        g_lastPrepareCueTick = now;
+    } else if (!prepare) {
+        g_prepareCueArmed = true;
+    }
+
+    if (activate && g_activateCueArmed && now - g_lastActivateCueTick > 4000) {
+        playCue(MB_ICONEXCLAMATION);
+        g_activateCueArmed = false;
+        g_lastActivateCueTick = now;
+    } else if (!activate) {
+        g_activateCueArmed = true;
+    }
 }
 
 COLORREF tempColor(uint16_t temp) {
@@ -791,6 +831,7 @@ void paintHud(HWND hwnd) {
         s = g_state;
         if (GetTickCount64() - s.lastSeenTick > 2000) s.connected = false;
     }
+    updateSystemAudioCues(s);
 
     HFONT tiny = makeFont(8, FW_BOLD);
     HFONT small = makeFont(9, FW_BOLD);

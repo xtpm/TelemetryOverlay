@@ -35,6 +35,8 @@ The launcher lets you choose:
 
 Close the overlay with `Ctrl + Shift + Q` by default, or change it from `overlay close keybind` in the launcher.
 
+Audio cues play before and when DRS/straight mode should be activated.
+
 ## F1 25 Telemetry Settings
 
 In F1 25, open telemetry settings and use:
