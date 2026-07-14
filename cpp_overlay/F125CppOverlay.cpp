@@ -1159,10 +1159,10 @@ struct LauncherAction {
 int g_hoverAction = 0;
 
 LauncherAction g_actions[] = {
-    {ID_REG_2025, {24, 144, 492, 232}, L"2025 REGULATIONS", L"DRS  /  ERS  /  TYRES  /  TIMING"},
-    {ID_REG_2026, {24, 248, 492, 336}, L"2026 REGULATIONS", L"ACTIVE AERO  /  ERS  /  TYRES  /  TIMING"},
-    {ID_SET_HOTKEY, {520, 220, 696, 294}, L"OVERLAY CLOSE KEYBIND", L""},
-    {ID_EXIT, {678, 18, 704, 44}, L"", L""}
+    {ID_REG_2025, {32, 146, 374, 318}, L"2025", L"DRS GENERATION"},
+    {ID_REG_2026, {398, 146, 740, 318}, L"2026", L"ACTIVE AERO GENERATION"},
+    {ID_SET_HOTKEY, {500, 346, 740, 414}, L"OVERLAY CLOSE KEYBIND", L""},
+    {ID_EXIT, {742, 15, 766, 39}, L"", L""}
 };
 
 void launchRegulation(RegulationMode mode) {
@@ -1218,41 +1218,46 @@ void drawLauncherAction(HDC dc, const LauncherAction& action, bool hover, HFONT 
     if (action.id == ID_SET_HOTKEY) {
         COLORREF accent = g_capturingHotkey ? rgb(245, 213, 71) : rgb(35, 243, 106);
         fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left,
-            action.rect.bottom - action.rect.top, hover ? rgb(17, 19, 21) : rgb(8, 9, 11));
-        fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, 1,
-            hover ? accent : rgb(58, 58, 56));
-        fillRect(dc, action.rect.left, action.rect.bottom - 1, action.rect.right - action.rect.left, 1,
-            hover ? accent : rgb(58, 58, 56));
+            action.rect.bottom - action.rect.top, hover ? rgb(16, 19, 23) : rgb(8, 10, 13));
+        fillRect(dc, action.rect.left, action.rect.top + 8, 1,
+            action.rect.bottom - action.rect.top - 16, rgb(45, 48, 53));
         drawText(dc, g_capturingHotkey ? L"PRESS KEY COMBINATION" : action.title,
-            action.rect.left + 12, action.rect.top + 11, 150, 13, microFont, accent, DT_LEFT | DT_SINGLELINE);
-        drawText(dc, g_capturingHotkey ? L"CTRL / SHIFT / ALT + KEY" : hotkeyText(),
-            action.rect.left + 12, action.rect.top + 34, 126, 24, keyFont, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        drawLauncherChevron(dc, action.rect.right - 24, action.rect.top + 29,
+            action.rect.left + 16, action.rect.top + 11, 184, 13, microFont, accent, DT_LEFT | DT_SINGLELINE);
+        std::wstring keyValue = g_capturingHotkey ? L"CTRL / SHIFT / ALT + KEY" : hotkeyText();
+        COLORREF keyColor = rgb(245, 245, 243);
+        if (!g_hotkeyHint.empty()) {
+            keyValue = g_hotkeyHint;
+            keyColor = g_hotkeyHint == L"saved" ? rgb(35, 243, 106) : rgb(255, 74, 74);
+        }
+        drawText(dc, keyValue, action.rect.left + 16, action.rect.top + 32, 180, 24,
+            keyFont, keyColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        drawLauncherChevron(dc, action.rect.right - 24, action.rect.top + 26,
             hover ? accent : rgb(110, 110, 104));
         return;
     }
 
     bool is2025 = action.id == ID_REG_2025;
     COLORREF accent = is2025 ? rgb(245, 213, 71) : rgb(35, 243, 106);
-    COLORREF fill = hover ? rgb(17, 19, 21) : rgb(8, 9, 11);
+    COLORREF fill = hover ? rgb(16, 19, 23) : rgb(9, 11, 14);
     fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left,
         action.rect.bottom - action.rect.top, fill);
-    fillRect(dc, action.rect.left, action.rect.top, 4, action.rect.bottom - action.rect.top, accent);
-    fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, 1,
-        hover ? accent : rgb(58, 58, 56));
-    fillRect(dc, action.rect.left, action.rect.bottom - 1, action.rect.right - action.rect.left, 1,
-        hover ? accent : rgb(58, 58, 56));
-    fillRect(dc, action.rect.left + 92, action.rect.top + 16, 1, 56, rgb(58, 58, 56));
+    strokeRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left,
+        action.rect.bottom - action.rect.top, hover ? rgb(76, 80, 86) : rgb(42, 45, 50));
+    fillRect(dc, action.rect.left, action.rect.bottom - 4,
+        action.rect.right - action.rect.left, 4, accent);
 
-    drawText(dc, is2025 ? L"25" : L"26", action.rect.left + 18, action.rect.top + 18,
-        60, 52, yearFont, accent, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    drawText(dc, action.title, action.rect.left + 114, action.rect.top + 17,
-        248, 22, cardTitle, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(dc, action.subtitle, action.rect.left + 114, action.rect.top + 48,
-        276, 16, cardBody, rgb(150, 150, 144), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(dc, is2025 ? L"DRS ERA" : L"ACTIVE AERO", action.rect.left + 114,
-        action.rect.top + 67, 120, 12, microFont, accent, DT_LEFT | DT_SINGLELINE);
-    drawLauncherChevron(dc, action.rect.right - 30, action.rect.top + 36,
+    drawText(dc, is2025 ? L"01" : L"02", action.rect.left + 22, action.rect.top + 18,
+        40, 14, microFont, accent, DT_LEFT | DT_SINGLELINE);
+    drawText(dc, action.subtitle, action.rect.left + 22, action.rect.top + 41,
+        240, 18, cardTitle, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(dc, action.title, action.rect.left + 20, action.rect.top + 66,
+        230, 62, yearFont, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(dc, action.rect.left + 22, action.rect.top + 134,
+        action.rect.right - action.rect.left - 44, 1, rgb(42, 45, 50));
+    drawText(dc, is2025 ? L"DRS   ERS   TYRES   TIMING" : L"AERO   ERS   TYRES   TIMING",
+        action.rect.left + 22, action.rect.top + 143, 260, 16,
+        cardBody, rgb(145, 149, 154), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawLauncherChevron(dc, action.rect.right - 38, action.rect.top + 76,
         hover ? accent : rgb(110, 110, 104));
 }
 
@@ -1266,28 +1271,28 @@ void paintLauncher(HWND hwnd) {
     HBITMAP memBitmap = CreateCompatibleBitmap(dc, rc.right, rc.bottom);
     HGDIOBJ oldBitmap = SelectObject(memDc, memBitmap);
 
-    fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(3, 4, 5));
-    strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(92, 92, 88));
-    fillRect(memDc, 1, 1, 216, 3, rgb(35, 243, 106));
-    fillRect(memDc, 217, 1, 74, 3, rgb(245, 213, 71));
-    fillRect(memDc, 291, 1, 32, 3, rgb(235, 0, 130));
-    fillRect(memDc, 20, 68, rc.right - 40, 1, rgb(58, 58, 56));
-    fillRect(memDc, 506, 88, 1, 270, rgb(58, 58, 56));
-    fillRect(memDc, 20, 376, rc.right - 40, 1, rgb(58, 58, 56));
+    fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(5, 6, 8));
+    strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(64, 67, 72));
+    fillRect(memDc, 1, 1, 128, 3, rgb(35, 243, 106));
+    fillRect(memDc, 24, 54, rc.right - 48, 1, rgb(42, 45, 50));
+    fillRect(memDc, 24, 340, rc.right - 48, 1, rgb(42, 45, 50));
+    fillRect(memDc, 24, 342, rc.right - 48, 74, rgb(7, 9, 12));
 
-    HFONT brand = makeFont(20, FW_BOLD);
-    HFONT brandSub = makeFont(8, FW_BOLD);
-    HFONT section = makeFont(9, FW_BOLD);
-    HFONT heading = makeFont(20, FW_BOLD);
-    HFONT cardTitle = makeFont(14, FW_BOLD);
-    HFONT cardBody = makeFont(9, FW_BOLD);
-    HFONT yearFont = makeFont(40, FW_BOLD);
+    HFONT brand = makeFont(17, FW_BOLD);
+    HFONT brandSub = makeFont(7, FW_BOLD);
+    HFONT section = makeFont(8, FW_BOLD);
+    HFONT heading = makeFont(26, FW_BOLD);
+    HFONT cardTitle = makeFont(11, FW_BOLD);
+    HFONT cardBody = makeFont(8, FW_BOLD);
+    HFONT yearFont = makeFont(52, FW_BOLD);
     HFONT micro = makeFont(8, FW_BOLD);
     HFONT keyFont = makeFont(12, FW_BOLD);
 
-    drawText(memDc, L"r_", 22, 18, 34, 28, brand, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"F1 TELEMETRY", 66, 14, 220, 26, brand, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"OVERLAY CONTROL", 66, 40, 180, 13, brandSub, rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"r_", 24, 14, 30, 26, brand, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"TELEMETRY OVERLAY", 62, 11, 220, 22, brand,
+        rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"MADE BY RETRIAL", 62, 34, 160, 11, brandSub,
+        rgb(126, 130, 135), DT_LEFT | DT_SINGLELINE);
 
     TelemetryState s;
     {
@@ -1296,43 +1301,36 @@ void paintLauncher(HWND hwnd) {
     }
     bool liveUdp = s.connected && GetTickCount64() - s.lastSeenTick <= 2000;
     COLORREF udpColor = liveUdp ? rgb(35, 243, 106) : rgb(245, 213, 71);
-    fillRect(memDc, 532, 25, 6, 6, udpColor);
-    drawText(memDc, liveUdp ? L"UDP LIVE" : L"UDP STANDBY", 548, 17, 104, 18,
-        section, udpColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"127.0.0.1 : 20777", 548, 37, 112, 12,
-        micro, rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"F1 25", 676, 18, 48, 16, section,
+        rgb(126, 130, 135), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    drawText(memDc, L"SELECT REGULATION", 24, 88, 200, 14, section,
+    drawText(memDc, L"CAR GENERATION", 32, 78, 180, 14, section,
         rgb(35, 243, 106), DT_LEFT | DT_SINGLELINE);
-    drawText(memDc, L"CAR GENERATION", 24, 107, 300, 27, heading,
+    drawText(memDc, L"CHOOSE REGULATIONS", 32, 99, 420, 34, heading,
         rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"2025  /  2026", 620, 106, 120, 18, section,
+        rgb(126, 130, 135), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    drawText(memDc, L"SYSTEM", 520, 88, 100, 14, section,
-        rgb(35, 243, 106), DT_LEFT | DT_SINGLELINE);
-    drawText(memDc, L"TELEMETRY INPUT", 520, 116, 150, 12, micro,
-        rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
-    drawText(memDc, liveUdp ? L"RECEIVING" : L"WAITING", 520, 134, 150, 19,
+    fillRect(memDc, 32, 365, 6, 6, udpColor);
+    drawText(memDc, L"UDP INPUT", 50, 354, 150, 12, micro,
+        rgb(126, 130, 135), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, liveUdp ? L"RECEIVING" : L"WAITING", 50, 374, 150, 18,
         keyFont, udpColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    fillRect(memDc, 520, 160, 176, 1, rgb(42, 42, 40));
-    drawText(memDc, L"VOICE CALLOUTS", 520, 176, 150, 12, micro,
-        rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
-    drawText(memDc, L"EMBEDDED / ON", 520, 194, 150, 19,
-        keyFont, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"127.0.0.1 : 20777", 50, 396, 150, 12,
+        micro, rgb(126, 130, 135), DT_LEFT | DT_SINGLELINE);
 
-    if (!g_hotkeyHint.empty()) {
-        COLORREF hintColor = g_hotkeyHint == L"saved" ? rgb(35, 243, 106) : rgb(255, 74, 74);
-        drawText(memDc, g_hotkeyHint, 520, 306, 176, 14, micro, hintColor, DT_LEFT | DT_SINGLELINE);
-    }
+    fillRect(memDc, 226, 354, 1, 50, rgb(42, 45, 50));
+    drawText(memDc, L"VOICE CALLOUTS", 250, 354, 190, 12, micro,
+        rgb(126, 130, 135), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"READY", 250, 374, 120, 18, keyFont,
+        rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"7 EMBEDDED CUES", 250, 396, 160, 12,
+        micro, rgb(126, 130, 135), DT_LEFT | DT_SINGLELINE);
 
     for (const auto& action : g_actions) {
         drawLauncherAction(memDc, action, g_hoverAction == action.id,
             cardTitle, cardBody, yearFont, micro, keyFont);
     }
-
-    drawText(memDc, L"MADE BY RETRIAL", 22, 397, 180, 14, section,
-        rgb(245, 245, 243), DT_LEFT | DT_SINGLELINE);
-    drawText(memDc, L"F1 25  /  NATIVE OVERLAY", 500, 397, 198, 14, micro,
-        rgb(110, 110, 104), DT_RIGHT | DT_SINGLELINE);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
@@ -1474,7 +1472,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     RegisterClassW(&wc);
 
-    constexpr int launcherWidth = 720;
+    constexpr int launcherWidth = 780;
     constexpr int launcherHeight = 430;
     RECT workArea{};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);

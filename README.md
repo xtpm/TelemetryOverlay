@@ -7,7 +7,7 @@ The app listens for F1 25 UDP telemetry on `127.0.0.1:20777` and provides a smal
 ## Features
 
 - Native Windows app
-- Borderless control-console launcher with separate 2025 and 2026 regulation modes
+- Minimal borderless launcher with separate 2025 and 2026 regulation modes
 - Retrial-style HUD
 - Timing strip
 - Live speed, gear, RPM, rev lights, fuel, ERS, tyre, lap, sector, penalties, throttle, brake, and steering telemetry
