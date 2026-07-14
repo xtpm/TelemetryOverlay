@@ -1159,10 +1159,10 @@ struct LauncherAction {
 int g_hoverAction = 0;
 
 LauncherAction g_actions[] = {
-    {ID_REG_2025, {238, 88, 596, 178}, L"2025 Regulations", L"DRS / ERS / tyres / timing"},
-    {ID_REG_2026, {238, 202, 596, 292}, L"2026 Regulations", L"active aero / ERS / tyres / timing"},
-    {ID_SET_HOTKEY, {238, 346, 438, 386}, L"overlay close keybind", L""},
-    {ID_EXIT, {492, 346, 596, 386}, L"exit", L""}
+    {ID_REG_2025, {24, 144, 492, 232}, L"2025 REGULATIONS", L"DRS  /  ERS  /  TYRES  /  TIMING"},
+    {ID_REG_2026, {24, 248, 492, 336}, L"2026 REGULATIONS", L"ACTIVE AERO  /  ERS  /  TYRES  /  TIMING"},
+    {ID_SET_HOTKEY, {520, 220, 696, 294}, L"OVERLAY CLOSE KEYBIND", L""},
+    {ID_EXIT, {678, 18, 704, 44}, L"", L""}
 };
 
 void launchRegulation(RegulationMode mode) {
@@ -1182,25 +1182,78 @@ void launchRegulation(RegulationMode mode) {
     }
 }
 
-void drawLauncherCard(HDC dc, const LauncherAction& action, bool hover, HFONT titleFont, HFONT bodyFont) {
-    COLORREF fill = hover ? rgb(18, 20, 23) : rgb(8, 9, 11);
-    COLORREF border = hover ? rgb(35, 243, 106) : rgb(58, 58, 56);
-    fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, fill);
-    strokeRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, border);
+void drawLauncherChevron(HDC dc, int x, int y, COLORREF color) {
+    HPEN pen = CreatePen(PS_SOLID, 2, color);
+    HGDIOBJ oldPen = SelectObject(dc, pen);
+    MoveToEx(dc, x, y, nullptr);
+    LineTo(dc, x + 8, y + 8);
+    LineTo(dc, x, y + 16);
+    SelectObject(dc, oldPen);
+    DeleteObject(pen);
+}
+
+void drawLauncherClose(HDC dc, const LauncherAction& action, bool hover) {
+    COLORREF color = hover ? rgb(255, 74, 74) : rgb(167, 167, 162);
     if (hover) {
-        fillRect(dc, action.rect.left, action.rect.top, 5, action.rect.bottom - action.rect.top, rgb(35, 243, 106));
+        fillRect(dc, action.rect.left, action.rect.top,
+            action.rect.right - action.rect.left, action.rect.bottom - action.rect.top, rgb(28, 10, 12));
     }
-    if (action.id == ID_EXIT || action.id == ID_SET_HOTKEY) {
-        const wchar_t* label = action.id == ID_SET_HOTKEY && g_capturingHotkey ? L"press keys" : action.title;
-        drawText(dc, label, action.rect.left, action.rect.top + 11, action.rect.right - action.rect.left, 18, titleFont,
-            action.id == ID_SET_HOTKEY && g_capturingHotkey ? rgb(245, 213, 71) : rgb(245, 245, 243), DT_CENTER);
+    HPEN pen = CreatePen(PS_SOLID, 2, color);
+    HGDIOBJ oldPen = SelectObject(dc, pen);
+    MoveToEx(dc, action.rect.left + 8, action.rect.top + 8, nullptr);
+    LineTo(dc, action.rect.right - 8, action.rect.bottom - 8);
+    MoveToEx(dc, action.rect.right - 8, action.rect.top + 8, nullptr);
+    LineTo(dc, action.rect.left + 8, action.rect.bottom - 8);
+    SelectObject(dc, oldPen);
+    DeleteObject(pen);
+}
+
+void drawLauncherAction(HDC dc, const LauncherAction& action, bool hover, HFONT cardTitle,
+    HFONT cardBody, HFONT yearFont, HFONT microFont, HFONT keyFont) {
+    if (action.id == ID_EXIT) {
+        drawLauncherClose(dc, action, hover);
         return;
     }
-    drawText(dc, action.title, action.rect.left + 18, action.rect.top + 17, 240, 24, titleFont, rgb(245, 245, 243), DT_LEFT);
-    drawText(dc, action.subtitle, action.rect.left + 18, action.rect.top + 50, 260, 18, bodyFont, rgb(167, 167, 162), DT_LEFT);
-    fillRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(20, 21, 23));
-    strokeRect(dc, action.rect.right - 104, action.rect.top + 28, 72, 28, hover ? rgb(35, 243, 106) : rgb(70, 70, 68));
-    drawText(dc, L"launch", action.rect.right - 94, action.rect.top + 34, 52, 18, bodyFont, hover ? rgb(4, 5, 6) : rgb(245, 245, 243), DT_CENTER);
+
+    if (action.id == ID_SET_HOTKEY) {
+        COLORREF accent = g_capturingHotkey ? rgb(245, 213, 71) : rgb(35, 243, 106);
+        fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left,
+            action.rect.bottom - action.rect.top, hover ? rgb(17, 19, 21) : rgb(8, 9, 11));
+        fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, 1,
+            hover ? accent : rgb(58, 58, 56));
+        fillRect(dc, action.rect.left, action.rect.bottom - 1, action.rect.right - action.rect.left, 1,
+            hover ? accent : rgb(58, 58, 56));
+        drawText(dc, g_capturingHotkey ? L"PRESS KEY COMBINATION" : action.title,
+            action.rect.left + 12, action.rect.top + 11, 150, 13, microFont, accent, DT_LEFT | DT_SINGLELINE);
+        drawText(dc, g_capturingHotkey ? L"CTRL / SHIFT / ALT + KEY" : hotkeyText(),
+            action.rect.left + 12, action.rect.top + 34, 126, 24, keyFont, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        drawLauncherChevron(dc, action.rect.right - 24, action.rect.top + 29,
+            hover ? accent : rgb(110, 110, 104));
+        return;
+    }
+
+    bool is2025 = action.id == ID_REG_2025;
+    COLORREF accent = is2025 ? rgb(245, 213, 71) : rgb(35, 243, 106);
+    COLORREF fill = hover ? rgb(17, 19, 21) : rgb(8, 9, 11);
+    fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left,
+        action.rect.bottom - action.rect.top, fill);
+    fillRect(dc, action.rect.left, action.rect.top, 4, action.rect.bottom - action.rect.top, accent);
+    fillRect(dc, action.rect.left, action.rect.top, action.rect.right - action.rect.left, 1,
+        hover ? accent : rgb(58, 58, 56));
+    fillRect(dc, action.rect.left, action.rect.bottom - 1, action.rect.right - action.rect.left, 1,
+        hover ? accent : rgb(58, 58, 56));
+    fillRect(dc, action.rect.left + 92, action.rect.top + 16, 1, 56, rgb(58, 58, 56));
+
+    drawText(dc, is2025 ? L"25" : L"26", action.rect.left + 18, action.rect.top + 18,
+        60, 52, yearFont, accent, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(dc, action.title, action.rect.left + 114, action.rect.top + 17,
+        248, 22, cardTitle, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(dc, action.subtitle, action.rect.left + 114, action.rect.top + 48,
+        276, 16, cardBody, rgb(150, 150, 144), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(dc, is2025 ? L"DRS ERA" : L"ACTIVE AERO", action.rect.left + 114,
+        action.rect.top + 67, 120, 12, microFont, accent, DT_LEFT | DT_SINGLELINE);
+    drawLauncherChevron(dc, action.rect.right - 30, action.rect.top + 36,
+        hover ? accent : rgb(110, 110, 104));
 }
 
 void paintLauncher(HWND hwnd) {
@@ -1214,24 +1267,27 @@ void paintLauncher(HWND hwnd) {
     HGDIOBJ oldBitmap = SelectObject(memDc, memBitmap);
 
     fillRect(memDc, 0, 0, rc.right, rc.bottom, rgb(3, 4, 5));
-    strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(116, 116, 110));
-    strokeRect(memDc, 10, 10, rc.right - 20, rc.bottom - 20, rgb(42, 42, 40));
-    fillRect(memDc, 22, 22, 186, rc.bottom - 44, rgb(8, 9, 11));
-    fillRect(memDc, 22, 22, 5, rc.bottom - 44, rgb(35, 243, 106));
-    fillRect(memDc, 220, 22, 1, rc.bottom - 44, rgb(42, 42, 40));
-    fillRect(memDc, 238, 58, 358, 1, rgb(42, 42, 40));
-    fillRect(memDc, 238, 330, 358, 1, rgb(42, 42, 40));
+    strokeRect(memDc, 0, 0, rc.right, rc.bottom, rgb(92, 92, 88));
+    fillRect(memDc, 1, 1, 216, 3, rgb(35, 243, 106));
+    fillRect(memDc, 217, 1, 74, 3, rgb(245, 213, 71));
+    fillRect(memDc, 291, 1, 32, 3, rgb(235, 0, 130));
+    fillRect(memDc, 20, 68, rc.right - 40, 1, rgb(58, 58, 56));
+    fillRect(memDc, 506, 88, 1, 270, rgb(58, 58, 56));
+    fillRect(memDc, 20, 376, rc.right - 40, 1, rgb(58, 58, 56));
 
-    HFONT title = makeFont(30, FW_BOLD, L"Exo 2");
-    HFONT logo = makeFont(24, FW_BOLD);
-    HFONT label = makeFont(12, FW_BOLD);
-    HFONT body = makeFont(10, FW_BOLD);
+    HFONT brand = makeFont(20, FW_BOLD);
+    HFONT brandSub = makeFont(8, FW_BOLD);
+    HFONT section = makeFont(9, FW_BOLD);
+    HFONT heading = makeFont(20, FW_BOLD);
+    HFONT cardTitle = makeFont(14, FW_BOLD);
+    HFONT cardBody = makeFont(9, FW_BOLD);
+    HFONT yearFont = makeFont(40, FW_BOLD);
     HFONT micro = makeFont(8, FW_BOLD);
+    HFONT keyFont = makeFont(12, FW_BOLD);
 
-    drawText(memDc, L"r_", 42, 42, 48, 28, logo, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"f1", 42, 92, 52, 40, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"telemetry", 42, 126, 154, 40, title, rgb(245, 245, 243), DT_LEFT);
-    drawText(memDc, L"made by retrial", 42, 176, 144, 18, label, rgb(167, 167, 162), DT_LEFT);
+    drawText(memDc, L"r_", 22, 18, 34, 28, brand, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"F1 TELEMETRY", 66, 14, 220, 26, brand, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"OVERLAY CONTROL", 66, 40, 180, 13, brandSub, rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
 
     TelemetryState s;
     {
@@ -1239,30 +1295,56 @@ void paintLauncher(HWND hwnd) {
         s = g_state;
     }
     bool liveUdp = s.connected && GetTickCount64() - s.lastSeenTick <= 2000;
-    drawText(memDc, liveUdp ? L"UDP LIVE" : L"WAITING FOR UDP", 42, 264, 144, 16, label, liveUdp ? rgb(35, 243, 106) : rgb(245, 213, 71), DT_LEFT);
-    drawText(memDc, L"127.0.0.1:20777", 42, 286, 144, 14, body, rgb(167, 167, 162), DT_LEFT);
-    drawText(memDc, L"Choose Regulations", 238, 30, 210, 24, label, rgb(245, 245, 243), DT_LEFT);
-    std::wstring hotkeyLine = g_capturingHotkey ? L"press close keybind now" : L"close: " + hotkeyText();
-    COLORREF hotkeyColor = g_capturingHotkey ? rgb(245, 213, 71) : rgb(110, 110, 104);
-    drawText(memDc, hotkeyLine, 238, 314, 260, 16, micro, hotkeyColor, DT_LEFT);
+    COLORREF udpColor = liveUdp ? rgb(35, 243, 106) : rgb(245, 213, 71);
+    fillRect(memDc, 532, 25, 6, 6, udpColor);
+    drawText(memDc, liveUdp ? L"UDP LIVE" : L"UDP STANDBY", 548, 17, 104, 18,
+        section, udpColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"127.0.0.1 : 20777", 548, 37, 112, 12,
+        micro, rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
+
+    drawText(memDc, L"SELECT REGULATION", 24, 88, 200, 14, section,
+        rgb(35, 243, 106), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"CAR GENERATION", 24, 107, 300, 27, heading,
+        rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+    drawText(memDc, L"SYSTEM", 520, 88, 100, 14, section,
+        rgb(35, 243, 106), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"TELEMETRY INPUT", 520, 116, 150, 12, micro,
+        rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, liveUdp ? L"RECEIVING" : L"WAITING", 520, 134, 150, 19,
+        keyFont, udpColor, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    fillRect(memDc, 520, 160, 176, 1, rgb(42, 42, 40));
+    drawText(memDc, L"VOICE CALLOUTS", 520, 176, 150, 12, micro,
+        rgb(150, 150, 144), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"EMBEDDED / ON", 520, 194, 150, 19,
+        keyFont, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
     if (!g_hotkeyHint.empty()) {
         COLORREF hintColor = g_hotkeyHint == L"saved" ? rgb(35, 243, 106) : rgb(255, 74, 74);
-        drawText(memDc, g_hotkeyHint, 238, 330, 260, 14, micro, hintColor, DT_LEFT);
+        drawText(memDc, g_hotkeyHint, 520, 306, 176, 14, micro, hintColor, DT_LEFT | DT_SINGLELINE);
     }
 
     for (const auto& action : g_actions) {
-        drawLauncherCard(memDc, action, g_hoverAction == action.id, label, body);
+        drawLauncherAction(memDc, action, g_hoverAction == action.id,
+            cardTitle, cardBody, yearFont, micro, keyFont);
     }
 
-    drawText(memDc, L"match the in-game UDP format", 42, 342, 144, 28, micro, rgb(110, 110, 104), DT_LEFT | DT_WORDBREAK);
+    drawText(memDc, L"MADE BY RETRIAL", 22, 397, 180, 14, section,
+        rgb(245, 245, 243), DT_LEFT | DT_SINGLELINE);
+    drawText(memDc, L"F1 25  /  NATIVE OVERLAY", 500, 397, 198, 14, micro,
+        rgb(110, 110, 104), DT_RIGHT | DT_SINGLELINE);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
-    DeleteObject(title);
-    DeleteObject(logo);
-    DeleteObject(label);
-    DeleteObject(body);
+    DeleteObject(brand);
+    DeleteObject(brandSub);
+    DeleteObject(section);
+    DeleteObject(heading);
+    DeleteObject(cardTitle);
+    DeleteObject(cardBody);
+    DeleteObject(yearFont);
     DeleteObject(micro);
+    DeleteObject(keyFont);
     SelectObject(memDc, oldBitmap);
     DeleteObject(memBitmap);
     DeleteDC(memDc);
@@ -1386,14 +1468,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.lpfnWndProc = menuProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"F125CppMenu";
+    wc.style = CS_DROPSHADOW;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     RegisterClassW(&wc);
 
+    constexpr int launcherWidth = 720;
+    constexpr int launcherHeight = 430;
+    RECT workArea{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+    int launcherX = workArea.left + (workArea.right - workArea.left - launcherWidth) / 2;
+    int launcherY = workArea.top + (workArea.bottom - workArea.top - launcherHeight) / 2;
+
     HWND menu = CreateWindowW(L"F125CppMenu", L"F1 25 Overlay Launcher",
         WS_POPUP,
-        160, 160, 635, 455, nullptr, nullptr, hInstance, nullptr);
+        launcherX, launcherY, launcherWidth, launcherHeight, nullptr, nullptr, hInstance, nullptr);
     ShowWindow(menu, nCmdShow);
     if (!registerCloseHotkey()) {
         g_hotkeyHint = L"hotkey unavailable";
