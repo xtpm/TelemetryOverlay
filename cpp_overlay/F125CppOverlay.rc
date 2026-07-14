@@ -2,3 +2,10 @@
 
 IDI_APP_ICON ICON "assets\\retrial_overlay.ico"
 IDR_EXO2_FONT RCDATA "assets\\Exo2.ttf"
+IDR_SOUND_DRS_APPROACHING WAVE "assets\\audio\\drs_approaching.wav"
+IDR_SOUND_DRS_READY WAVE "assets\\audio\\drs_ready.wav"
+IDR_SOUND_PREPARE_STRAIGHT WAVE "assets\\audio\\prepare_straight.wav"
+IDR_SOUND_STRAIGHT_READY WAVE "assets\\audio\\straight_ready.wav"
+IDR_SOUND_LOW_BATTERY WAVE "assets\\audio\\low_battery.wav"
+IDR_SOUND_ERS_FAULT WAVE "assets\\audio\\ers_fault.wav"
+IDR_SOUND_DRS_FAULT WAVE "assets\\audio\\drs_fault.wav"

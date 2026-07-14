@@ -3,6 +3,7 @@
 #include <windowsx.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <mmsystem.h>
 #include <cstdint>
 #include <cstdio>
 #include <cmath>
@@ -18,6 +19,7 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Msimg32.lib")
+#pragma comment(lib, "Winmm.lib")
 
 namespace {
 
@@ -30,6 +32,7 @@ constexpr int HOTKEY_EXIT_ID = 1;
 
 struct TelemetryState {
     bool connected = false;
+    bool hasStatusPacket = false;
     uint16_t packetFormat = 0;
     uint32_t packetCount = 0;
     uint64_t lastSeenTick = 0;
@@ -115,8 +118,13 @@ bool g_capturingHotkey = false;
 std::wstring g_hotkeyHint = L"";
 bool g_prepareCueArmed = true;
 bool g_activateCueArmed = true;
+bool g_lowBatteryCueArmed = true;
+bool g_faultCueArmed = true;
 uint64_t g_lastPrepareCueTick = 0;
 uint64_t g_lastActivateCueTick = 0;
+uint64_t g_lastLowBatteryCueTick = 0;
+uint64_t g_lastFaultCueTick = 0;
+uint64_t g_lastVoiceCueTick = 0;
 
 enum class RegulationMode {
     Reg2025,
@@ -270,8 +278,16 @@ bool regulationSystemActive(const TelemetryState& s) {
     return g_regulationMode == RegulationMode::Reg2025 ? s.drsActive != 0 : s.activeAeroMode != 0;
 }
 
-void playCue(UINT sound) {
-    MessageBeep(sound);
+bool playVoiceCue(int resourceId) {
+    uint64_t now = GetTickCount64();
+    if (now - g_lastVoiceCueTick < 1200) return false;
+
+    if (!PlaySoundW(MAKEINTRESOURCEW(resourceId), g_instance, SND_RESOURCE | SND_ASYNC | SND_NODEFAULT)) {
+        return false;
+    }
+
+    g_lastVoiceCueTick = now;
+    return true;
 }
 
 void updateSystemAudioCues(const TelemetryState& s) {
@@ -279,30 +295,53 @@ void updateSystemAudioCues(const TelemetryState& s) {
 
     uint64_t now = GetTickCount64();
     bool prepare = false;
-    bool activate = false;
+    bool systemReady = false;
+    int prepareSound = 0;
+    int readySound = 0;
 
     if (g_regulationMode == RegulationMode::Reg2025) {
         prepare = !s.drsAllowed && s.drsActivationDistance > 0 && s.drsActivationDistance <= 150;
-        activate = s.drsAllowed && !s.drsActive;
+        systemReady = s.drsAllowed != 0;
+        prepareSound = IDR_SOUND_DRS_APPROACHING;
+        readySound = IDR_SOUND_DRS_READY;
     } else {
         prepare = !s.activeAeroMode && !s.activeAeroAvailable && s.speed >= 220 && s.throttle > 0.85f && s.brake < 0.05f;
-        activate = s.activeAeroAvailable && !s.activeAeroMode;
+        systemReady = s.activeAeroAvailable != 0;
+        prepareSound = IDR_SOUND_PREPARE_STRAIGHT;
+        readySound = IDR_SOUND_STRAIGHT_READY;
     }
 
-    if (prepare && g_prepareCueArmed && now - g_lastPrepareCueTick > 4000) {
-        playCue(MB_ICONASTERISK);
+    if (prepare && g_prepareCueArmed && now - g_lastPrepareCueTick > 4000 && playVoiceCue(prepareSound)) {
         g_prepareCueArmed = false;
         g_lastPrepareCueTick = now;
     } else if (!prepare) {
         g_prepareCueArmed = true;
     }
 
-    if (activate && g_activateCueArmed && now - g_lastActivateCueTick > 4000) {
-        playCue(MB_ICONEXCLAMATION);
+    if (systemReady && !regulationSystemActive(s) && g_activateCueArmed && now - g_lastActivateCueTick > 4000 && playVoiceCue(readySound)) {
         g_activateCueArmed = false;
         g_lastActivateCueTick = now;
-    } else if (!activate) {
+    } else if (!systemReady) {
         g_activateCueArmed = true;
+    }
+
+    if (!s.hasStatusPacket) return;
+
+    float ersPct = clampf(s.ersEnergy / static_cast<float>(ERS_MAX_JOULES), 0, 1) * 100.0f;
+    if (ersPct <= 15.0f && g_lowBatteryCueArmed && now - g_lastLowBatteryCueTick > 10000 && playVoiceCue(IDR_SOUND_LOW_BATTERY)) {
+        g_lowBatteryCueArmed = false;
+        g_lastLowBatteryCueTick = now;
+    } else if (ersPct >= 22.0f) {
+        g_lowBatteryCueArmed = true;
+    }
+
+    bool systemFault = s.ersFault || (g_regulationMode == RegulationMode::Reg2025 && s.drsFault);
+    int faultSound = s.ersFault ? IDR_SOUND_ERS_FAULT : IDR_SOUND_DRS_FAULT;
+    if (systemFault && g_faultCueArmed && now - g_lastFaultCueTick > 10000 && playVoiceCue(faultSound)) {
+        g_faultCueArmed = false;
+        g_lastFaultCueTick = now;
+    } else if (!systemFault) {
+        g_faultCueArmed = true;
     }
 }
 
@@ -393,20 +432,20 @@ void drawText(HDC dc, const std::wstring& text, int x, int y, int w, int h, HFON
     SelectObject(dc, oldFont);
 }
 
-void drawChip(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont) {
+void drawChip(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT smallFont, HFONT valueFont) {
     strokeRect(dc, x, y, w, 34, rgb(64, 64, 64));
-    drawText(dc, label, x + 3, y + 4, w - 6, 10, small, rgb(160, 160, 154), DT_CENTER);
+    drawText(dc, label, x + 3, y + 4, w - 6, 10, smallFont, rgb(160, 160, 154), DT_CENTER);
     drawText(dc, value, x + 3, y + 17, w - 6, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
-void drawStatCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont, bool divider) {
+void drawStatCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT smallFont, HFONT valueFont, bool divider) {
     if (divider) fillRect(dc, x, y + 7, 1, 26, rgb(58, 58, 56));
-    drawText(dc, label, x + 8, y + 5, w - 16, 10, small, rgb(160, 160, 154), DT_CENTER);
+    drawText(dc, label, x + 8, y + 5, w - 16, 10, smallFont, rgb(160, 160, 154), DT_CENTER);
     drawText(dc, value, x + 8, y + 18, w - 16, 15, valueFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
-void drawInfoCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT small, HFONT valueFont, COLORREF color = RGB(245, 245, 243)) {
-    drawText(dc, label, x, y, w, 10, small, rgb(160, 160, 154), DT_LEFT);
+void drawInfoCell(HDC dc, const wchar_t* label, const std::wstring& value, int x, int y, int w, HFONT smallFont, HFONT valueFont, COLORREF color = RGB(245, 245, 243)) {
+    drawText(dc, label, x, y, w, 10, smallFont, rgb(160, 160, 154), DT_LEFT);
     drawText(dc, value, x, y + 12, w, 16, valueFont, color, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 }
 
@@ -610,6 +649,7 @@ void parseStatus(const uint8_t* data, size_t size, uint16_t format, uint8_t play
     size_t stride = layout2026 ? 59 : 55;
     size_t base = HEADER_SIZE + static_cast<size_t>(playerIndex) * stride;
     if (base + stride > size) return;
+    s.hasStatusPacket = true;
     s.fuelInTank = readAt<float>(data, size, base + 5);
     s.fuelCapacity = readAt<float>(data, size, base + 9);
     s.fuelLaps = readAt<float>(data, size, base + 13);
@@ -834,7 +874,7 @@ void paintHud(HWND hwnd) {
     updateSystemAudioCues(s);
 
     HFONT tiny = makeFont(8, FW_BOLD);
-    HFONT small = makeFont(9, FW_BOLD);
+    HFONT smallFont = makeFont(9, FW_BOLD);
     HFONT value = makeFont(12, FW_BOLD, L"Exo 2");
     HFONT big = makeFont(46, FW_BOLD, L"Exo 2");
     HFONT med = makeFont(25, FW_BOLD, L"Exo 2");
@@ -859,7 +899,7 @@ void paintHud(HWND hwnd) {
 
     fillRect(memDc, 116, 12, 282, 92, panel);
     strokeRect(memDc, 116, 12, 282, 92, line);
-    drawText(memDc, L"r_", 128, 20, 24, 16, small, rgb(245, 245, 243), DT_LEFT);
+    drawText(memDc, L"r_", 128, 20, 24, 16, smallFont, rgb(245, 245, 243), DT_LEFT);
     drawText(memDc, s.connected ? L"telemetry live" : L"checking...", 154, 21, 112, 14, tiny, muted, DT_LEFT);
     if (s.packetFormat) {
         std::wstring udpFormat = L"udp " + std::to_wstring(s.packetFormat);
@@ -874,9 +914,9 @@ void paintHud(HWND hwnd) {
         fillRect(memDc, revX + i * 13, 42, 10, 8, c);
     }
 
-    drawText(memDc, L"KM/H", 128, 58, 48, 12, small, muted, DT_LEFT);
+    drawText(memDc, L"KM/H", 128, 58, 48, 12, smallFont, muted, DT_LEFT);
     drawText(memDc, std::to_wstring(s.speed), 128, 70, 92, 30, med, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"RPM", 252, 58, 48, 12, small, muted, DT_LEFT);
+    drawText(memDc, L"RPM", 252, 58, 48, 12, smallFont, muted, DT_LEFT);
     wchar_t rpmBuf[16];
     swprintf_s(rpmBuf, L"%05u", s.rpm);
     drawText(memDc, rpmBuf, 252, 70, 104, 30, med, rgb(245, 245, 243), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
@@ -901,14 +941,14 @@ void paintHud(HWND hwnd) {
     swprintf_s(fuel, L"%.1fL", s.fuelInTank);
     wchar_t est[16];
     swprintf_s(est, L"%.1f", s.fuelLaps);
-    drawStatCell(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 18, 124, 44, small, value, false);
-    drawStatCell(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 62, 124, 44, small, value, true);
-    drawStatCell(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 106, 124, 44, small, value, true);
-    drawStatCell(memDc, L"pen", pen, 150, 124, 92, small, value, true);
-    drawStatCell(memDc, L"fuel", fuel, 242, 124, 74, small, value, true);
-    drawStatCell(memDc, L"est", est, 316, 124, 64, small, value, true);
-    drawStatCell(memDc, L"ers", ersStatusText(s, ersPct), 380, 124, 94, small, value, true);
-    drawStatCell(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 474, 124, 128, small, value, true);
+    drawStatCell(memDc, L"pos", std::to_wstring(s.position ? s.position : 0), 18, 124, 44, smallFont, value, false);
+    drawStatCell(memDc, L"lap", std::to_wstring(s.lap ? s.lap : 0), 62, 124, 44, smallFont, value, true);
+    drawStatCell(memDc, L"sec", std::to_wstring(s.sector ? s.sector : 0), 106, 124, 44, smallFont, value, true);
+    drawStatCell(memDc, L"pen", pen, 150, 124, 92, smallFont, value, true);
+    drawStatCell(memDc, L"fuel", fuel, 242, 124, 74, smallFont, value, true);
+    drawStatCell(memDc, L"est", est, 316, 124, 64, smallFont, value, true);
+    drawStatCell(memDc, L"ers", ersStatusText(s, ersPct), 380, 124, 94, smallFont, value, true);
+    drawStatCell(memDc, L"tyre", tyreName(s.tyreCompound) + L" " + std::to_wstring(s.tyreAge) + L"l", 474, 124, 128, smallFont, value, true);
 
     fillRect(memDc, 12, 176, 596, 30, panel);
     strokeRect(memDc, 12, 176, 596, 30, line);
@@ -919,7 +959,7 @@ void paintHud(HWND hwnd) {
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
     DeleteObject(tiny);
-    DeleteObject(small);
+    DeleteObject(smallFont);
     DeleteObject(value);
     DeleteObject(big);
     DeleteObject(med);
@@ -1020,21 +1060,21 @@ void paintTiming(HWND hwnd) {
         s = g_state;
     }
 
-    HFONT small = makeFont(12, FW_BOLD);
+    HFONT smallFont = makeFont(12, FW_BOLD);
     HFONT value = makeFont(16, FW_BOLD, L"Exo 2");
     HFONT sectorFont = makeFont(14, FW_BOLD, L"Exo 2");
 
     uint32_t best = s.personalBestLapMs ? s.personalBestLapMs : s.sessionBestLapMs;
     int delta = s.stableDeltaMs;
 
-    drawText(memDc, L"current:", 16, 14, 80, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"current:", 16, 14, 80, 18, smallFont, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatLap(s.currentLapMs), 150, 11, 90, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"best:", 250, 14, 70, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"best:", 250, 14, 70, 18, smallFont, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatLap(best), 330, 11, 84, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    drawText(memDc, L"last:", 16, 40, 80, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"last:", 16, 40, 80, 18, smallFont, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatLap(s.lastLapMs), 150, 37, 90, 24, value, rgb(245, 245, 243), DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"delta:", 250, 40, 70, 18, small, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"delta:", 250, 40, 70, 18, smallFont, rgb(167, 167, 162), DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     COLORREF deltaColor = delta == DELTA_UNKNOWN ? rgb(245, 245, 243) : (delta <= 0 ? rgb(35, 243, 106) : rgb(255, 74, 74));
     drawText(memDc, formatDelta(delta), 330, 37, 84, 24, value, deltaColor, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
@@ -1043,16 +1083,16 @@ void paintTiming(HWND hwnd) {
     fillRect(memDc, 16 + col, 76, 1, 44, rgb(64, 64, 64));
     fillRect(memDc, 16 + col * 2, 76, 1, 44, rgb(64, 64, 64));
     uint32_t s3 = s.lastLapMs && s.sector1Ms && s.sector2Ms ? s.lastLapMs - s.sector1Ms - s.sector2Ms : 0;
-    drawText(memDc, L"s1", 16, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"s1", 16, 80, col, 14, smallFont, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatShortMs(s.sector1Ms), 16, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"s2", 16 + col, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"s2", 16 + col, 80, col, 14, smallFont, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatShortMs(s.sector2Ms), 16 + col, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    drawText(memDc, L"s3", 16 + col * 2, 80, col, 14, small, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    drawText(memDc, L"s3", 16 + col * 2, 80, col, 14, smallFont, rgb(167, 167, 162), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     drawText(memDc, formatShortMs(s3), 16 + col * 2, 96, col, 20, sectorFont, rgb(245, 245, 243), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     BitBlt(dc, 0, 0, rc.right, rc.bottom, memDc, 0, 0, SRCCOPY);
 
-    DeleteObject(small);
+    DeleteObject(smallFont);
     DeleteObject(value);
     DeleteObject(sectorFont);
     SelectObject(memDc, oldBitmap);
@@ -1127,6 +1167,10 @@ LauncherAction g_actions[] = {
 
 void launchRegulation(RegulationMode mode) {
     g_regulationMode = mode;
+    g_prepareCueArmed = true;
+    g_activateCueArmed = true;
+    g_lowBatteryCueArmed = true;
+    g_faultCueArmed = true;
     if (!g_hud) {
         g_hud = createOverlayWindow(L"F125CppHud", L"HUD", 80, 80, 620, 220, hudProc);
     }
@@ -1369,5 +1413,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     UnregisterHotKey(nullptr, HOTKEY_EXIT_ID);
     if (network.joinable()) network.join();
     if (g_exoFont) RemoveFontMemResourceEx(g_exoFont);
+    PlaySoundW(nullptr, nullptr, 0);
     return 0;
 }

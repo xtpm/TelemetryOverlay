@@ -24,7 +24,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-cl /nologo /EHsc /std:c++17 /O2 /DUNICODE /D_UNICODE cpp_overlay\F125CppOverlay.cpp build\F125CppOverlay.res /Fo:build\F125CppOverlay.obj /Fe:build\F125CppOverlay.exe /link User32.lib Gdi32.lib Msimg32.lib Ws2_32.lib
+cl /nologo /EHsc /std:c++17 /O2 /DUNICODE /D_UNICODE cpp_overlay\F125CppOverlay.cpp build\F125CppOverlay.res /Fo:build\F125CppOverlay.obj /Fe:build\F125CppOverlay.exe /link User32.lib Gdi32.lib Msimg32.lib Ws2_32.lib Winmm.lib
 if errorlevel 1 (
   pause
   exit /b 1

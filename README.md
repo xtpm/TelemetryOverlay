@@ -35,7 +35,9 @@ The launcher lets you choose:
 
 Close the overlay with `Ctrl + Shift + Q` by default, or change it from `overlay close keybind` in the launcher.
 
-Audio cues play before and when DRS/straight mode should be activated.
+Embedded racing-engineer voice clips announce approaching and ready states for DRS/straight mode, low battery, and system faults. They do not use Windows text-to-speech.
+
+Voice clips were generated with the MIT-licensed [Piper `en_GB-alan-medium` voice model](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_GB/alan/medium).
 
 ## F1 25 Telemetry Settings
 
